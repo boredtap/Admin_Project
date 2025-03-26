@@ -93,36 +93,27 @@ const ProfileOverlay: React.FC<ProfileOverlayProps> = ({ onClose, user }) => {
 
   const handleAction = async (action: "ban" | "suspend" | "resume") => {
     const endpoint = `${API_BASE_URL}/admin/security/suspend_user/${displayData.telegram_user_id}`;
-    interface ActionBody {
-      status: string;
-      end_date?: string;
-      reason?: string;
-    }
-
-    const body: ActionBody = {
-      status: action === "ban" ? "disband" : action === "resume" ? "active" : "suspend",
-    };
+    let url = `${endpoint}?status=${action}`; // Send "resume", "suspend", or "ban" as query param
     if (action === "suspend" && suspendEndDate) {
-      body.end_date = suspendEndDate.toISOString().split("T")[0];
-      body.reason = "admin_action";
+      url += `&end_date=${suspendEndDate.toISOString().split("T")[0]}&reason=admin_action`;
     }
 
     try {
-      const response = await fetch(endpoint, {
+      const response = await fetch(url, {
         method: "PUT",
         headers: {
           Authorization: `Bearer ${localStorage.getItem("access_token")}`,
           "Content-Type": "application/json",
           Accept: "application/json",
         },
-        body: JSON.stringify(body),
       });
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(`Failed to ${action} user: ${response.status} - ${JSON.stringify(errorData)}`);
       }
       const data = await response.json();
-      const newStatus = action === "ban" ? "disband" : action === "resume" ? "active" : "suspend";
+      // Map backend status to frontend display status
+      const newStatus = action === "resume" ? "active" : action === "suspend" ? "suspend" : "ban";
       setSuccessMessage(data.message || `${action.charAt(0).toUpperCase() + action.slice(1)} successful`);
       setShowActionOverlay(null);
       setShowSuccessOverlay(true);
@@ -159,11 +150,11 @@ const ProfileOverlay: React.FC<ProfileOverlayProps> = ({ onClose, user }) => {
     return (
       <div className="absolute top-full mt-2 w-[220px] bg-white rounded-lg p-2 shadow-lg z-10 text-black">
         <div className="flex justify-between items-center mb-1">
-          <button onClick={() => changeMonth(-1)} className="text-sm">&lt;</button>
+          <button onClick={() => changeMonth(-1)} className="text-sm">{"<"}</button>
           <span className="text-xs font-medium">
             {months[currentMonth.getMonth()]} {currentMonth.getFullYear()}
           </span>
-          <button onClick={() => changeMonth(1)} className="text-sm">&gt;</button>
+          <button onClick={() => changeMonth(1)} className="text-sm">{">"}</button>
         </div>
         <div className="grid grid-cols-7 gap-1 text-center text-[10px] text-gray-600">
           {weekDays.map((day) => (
@@ -210,8 +201,8 @@ const ProfileOverlay: React.FC<ProfileOverlayProps> = ({ onClose, user }) => {
     );
 
   const isActive = displayData.status?.toString().toLowerCase() === "active";
-  const isSuspended = displayData.status?.toString().toLowerCase() === "suspended";
-  const isDisband = displayData.status?.toString().toLowerCase() === "disband";
+  const isSuspended = displayData.status?.toString().toLowerCase() === "suspend";
+  const isDisband = displayData.status?.toString().toLowerCase() === "ban"; // Using "ban" to match backend
 
   console.log("ProfileOverlay - displayData:", displayData);
   console.log("isActive:", isActive, "isSuspended:", isSuspended, "isDisband:", isDisband);
@@ -436,7 +427,7 @@ const ProfileOverlay: React.FC<ProfileOverlayProps> = ({ onClose, user }) => {
               Resume
             </button>
           )}
-          {isDisband && <p className="text-red-500 text-sm">User is disbanded</p>}
+          {isDisband && <p className="text-red-500 text-sm">User is banned</p>}
         </div>
       </div>
 
