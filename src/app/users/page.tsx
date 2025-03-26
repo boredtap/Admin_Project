@@ -1,5 +1,3 @@
-// src/app/users/page.tsx
-
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -16,9 +14,8 @@ interface Filters {
 }
 
 const Users: React.FC = () => {
-  const [selectedRow, setSelectedRow] = useState<number | null>(null); // Changed to single selection
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [error, setError] = useState<string | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null); // Keep error state
   const [activeTab, setActiveTab] = useState<"All Users" | "Top 1000">("All Users");
   const [showActionDropdown, setShowActionDropdown] = useState<number | null>(null);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
@@ -26,7 +23,6 @@ const Users: React.FC = () => {
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [currentPage, setCurrentPage] = useState(1);
   const [showOverlay, setShowOverlay] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [usersData, setUsersData] = useState<{
     "All Users": User[];
     "Top 1000": User[];
@@ -35,11 +31,7 @@ const Users: React.FC = () => {
     "Top 1000": [],
   });
   const [filters, setFilters] = useState<Filters>({
-    status: {
-      Active: false,
-      Suspended: false,
-      Disband: false, // Assuming "Disband" is "banned" or similar
-    },
+    status: { Active: false, Suspended: false, Disband: false },
     level: {
       "Novice-Lv 1": false,
       "Explorer-Lv 2": false,
@@ -64,10 +56,7 @@ const Users: React.FC = () => {
       if (!token) throw new Error("No access token found");
 
       const response = await fetch(`${API_BASE_URL}/admin/user_management/users`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/json",
-        },
+        headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
       });
 
       if (!response.ok) throw new Error("Failed to fetch users");
@@ -85,11 +74,7 @@ const Users: React.FC = () => {
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return "DD-MM-YYYY";
     const date = new Date(dateStr);
-    return date.toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
+    return date.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
   };
 
   const handleFilterChange = (category: "status" | "level", value: string) => {
@@ -117,21 +102,31 @@ const Users: React.FC = () => {
     });
   };
 
-  const handleRowClick = (index: number) => {
-    setSelectedRow(selectedRow === index ? null : index); // Toggle single selection
-    setSelectedUser(filteredData[index]);
-    setShowOverlay(true);
+  const handleRowClick = (userId: string) => {
+    setSelectedUserId(userId);
+    const user = filteredData.find((u) => u.telegram_user_id === userId);
+    if (user) {
+      setShowOverlay(true);
+    }
   };
 
   const handleActionClick = (index: number) => {
     setShowActionDropdown(showActionDropdown === index ? null : index);
   };
 
-  const handleDelete = () => {
-    if (selectedRow === null) return;
-    const updatedData = usersData[activeTab].filter((_, index) => index !== selectedRow);
-    setUsersData((prev) => ({ ...prev, [activeTab]: updatedData }));
-    setSelectedRow(null);
+  const handleStatusUpdate = (userId: string, newStatus: string) => {
+    setUsersData((prev) => ({
+      ...prev,
+      [activeTab]: prev[activeTab].map((user) =>
+        user.telegram_user_id === userId ? { ...user, status: newStatus } : user
+      ),
+    }));
+    if (selectedUserId === userId) {
+      const user = filteredData.find((u) => u.telegram_user_id === userId);
+      if (user) {
+        setShowOverlay(true);
+      }
+    }
   };
 
   const handleExport = () => {
@@ -142,7 +137,7 @@ const Users: React.FC = () => {
       "Coins Earned": user.coins_earned,
       "Invite Count": user.invite_count,
       "Registration Date": formatDate(user.registration_date),
-      Status: user.status,
+      Status: user.status ?? "Unknown", // Handle null status
     }));
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
     const workbook = XLSX.utils.book_new();
@@ -154,8 +149,7 @@ const Users: React.FC = () => {
     const statusMatch = Object.keys(filters.status).some(
       (status) =>
         filters.status[status] &&
-        typeof user.status === "string" &&
-        user.status.toLowerCase() === status.toLowerCase()
+        user.status?.toString().toLowerCase() === status.toLowerCase()
     );
     const levelMatch = Object.keys(filters.level).some(
       (level) =>
@@ -178,17 +172,15 @@ const Users: React.FC = () => {
         <AppBar screenName="Users Mgt" />
         <div className="flex-1 pt-28 pl-44 pr-2 bg-[#141414] lg:pl-52 sm:pt-24 sm:pl-0">
           <div className="flex-1 py-4 min-w-0 max-w-[calc(100%)]">
+            {error && <div className="text-red-500 text-center text-xs">Error: {error}</div>} {/* Display error */}
             <div className="bg-[#202022] rounded-lg p-4 border border-white/20">
-              {/* Tabs and Buttons */}
               <div className="flex justify-between items-center mb-4">
                 <div className="flex gap-4">
                   {["All Users", "Top 1000"].map((tab) => (
                     <span
                       key={tab}
                       className={`text-xs cursor-pointer pb-1 ${
-                        activeTab === tab
-                          ? "text-white font-bold border-b-2 border-orange-500"
-                          : "text-gray-500"
+                        activeTab === tab ? "text-white font-bold border-b-2 border-orange-500" : "text-gray-500"
                       }`}
                       onClick={() => setActiveTab(tab as typeof activeTab)}
                     >
@@ -207,10 +199,8 @@ const Users: React.FC = () => {
                 </div>
               </div>
 
-              {/* Divider */}
               <div className="border-t border-white/20 mb-4"></div>
 
-              {/* Search, Date, Delete */}
               <div className="flex justify-between items-center mb-4">
                 <div className="flex items-center bg-[#19191A] rounded-lg w-full max-w-[500px] h-[54px] p-4 relative sm:h-10">
                   <Image src="/search.png" alt="Search" width={16} height={16} />
@@ -272,21 +262,11 @@ const Users: React.FC = () => {
                     <Image src="/Date.png" alt="Date" width={12} height={12} />
                     <span>{formatDate(selectedDate?.toISOString())}</span>
                   </button>
-                  <button
-                    className="flex items-center gap-2 bg-red-600 text-white text-xs px-3 py-2 rounded-lg"
-                    onClick={handleDelete}
-                    disabled={selectedRow === null} // Disable if no row selected
-                  >
-                    <Image src="/delete.png" alt="Delete" width={12} height={12} />
-                    Delete
-                  </button>
                 </div>
               </div>
 
-              {/* Divider */}
               <div className="border-t border-white/20 mb-4"></div>
 
-              {/* Table Headers */}
               <div className="grid grid-cols-[40px_1fr_1fr_1fr_1fr_1fr_1fr_1fr] gap-3 text-[#AEAAAA] text-xs font-medium mb-2">
                 <div />
                 <div>Username</div>
@@ -298,89 +278,108 @@ const Users: React.FC = () => {
                 <div>Action</div>
               </div>
 
-              {/* Divider */}
               <div className="border-t border-white/20 mb-4"></div>
 
-              {/* Table Content */}
               {filteredData.length === 0 ? (
                 <div className="text-white text-xs">No users to display</div>
               ) : (
                 filteredData
                   .slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage)
-                  .map((user, index) => (
-                    <div
-                      key={index}
-                      className={`grid grid-cols-[40px_1fr_1fr_1fr_1fr_1fr_1fr_1fr] gap-3 py-3 text-xs ${
-                        selectedRow === index ? "bg-white text-black rounded-lg" : "text-white"
-                      }`}
-                      onClick={() => handleRowClick(index)}
-                    >
-                      <div className="flex items-center justify-center">
-                        <div
-                          className={`w-4 h-4 border-2 rounded-full cursor-pointer flex items-center justify-center ${
-                            selectedRow === index ? "border-black bg-black" : "border-white"
-                          }`}
-                        >
-                          {selectedRow === index && (
-                            <div className="w-2 h-2 bg-white rounded-full" />
+                  .map((user, index) => {
+                    const isActive = user.status?.toString().toLowerCase() === "active";
+                    const isSuspended = user.status?.toString().toLowerCase() === "suspend";
+                    const isDisband = user.status?.toString().toLowerCase() === "ban";
+                    return (
+                      <div
+                        key={user.telegram_user_id}
+                        className={`grid grid-cols-[40px_1fr_1fr_1fr_1fr_1fr_1fr_1fr] gap-3 py-3 text-xs ${
+                          selectedUserId === user.telegram_user_id ? "bg-white text-black rounded-lg" : "text-white"
+                        }`}
+                        onClick={() => handleRowClick(user.telegram_user_id)}
+                      >
+                        <div className="flex items-center justify-center">
+                          <div
+                            className={`w-4 h-4 border-2 rounded-full cursor-pointer flex items-center justify-center ${
+                              selectedUserId === user.telegram_user_id ? "border-black bg-black" : "border-white"
+                            }`}
+                          >
+                            {selectedUserId === user.telegram_user_id && (
+                              <div className="w-2 h-2 bg-white rounded-full" />
+                            )}
+                          </div>
+                        </div>
+                        <div>{user.username}</div>
+                        <div>{user.level_name}</div>
+                        <div className="flex items-center gap-2">
+                          <Image src="/logo.png" alt="Coin" width={16} height={16} />
+                          {user.coins_earned}
+                        </div>
+                        <div>{user.invite_count}</div>
+                        <div>{formatDate(user.registration_date)}</div>
+                        <div>
+                          <span
+                            className={`px-2 py-1 rounded text-xs ${
+                              isActive
+                                ? "bg-[#E7F7EF] text-[#0CAF60]"
+                                : isSuspended
+                                ? "bg-[#FFD8D8] text-[#FF0000]"
+                                : isDisband
+                                ? "bg-[#D8CBFD] text-[#551DEC]"
+                                : "bg-gray-500 text-white"
+                            }`}
+                          >
+                            {user.status ?? "Unknown"}
+                          </span>
+                        </div>
+                        <div className="relative">
+                          <div
+                            className="flex items-center gap-2 cursor-pointer"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleActionClick(index);
+                            }}
+                          >
+                            <span className="text-xs">Action</span>
+                            <Image src="/dropdown.png" alt="Dropdown" width={16} height={16} />
+                          </div>
+                          {showActionDropdown === index && (
+                            <div className="absolute right-0 mt-2 w-32 bg-white rounded-lg shadow-lg z-10 text-black p-2">
+                              {isActive && (
+                                <>
+                                  <div
+                                    className="flex items-center gap-2 px-2 py-2 hover:bg-gray-100 cursor-pointer text-xs"
+                                    onClick={() => handleStatusUpdate(user.telegram_user_id, "suspend")}
+                                  >
+                                    <Image src="/disband.png" alt="Suspend" width={12} height={12} />
+                                    Suspend
+                                  </div>
+                                  <div
+                                    className="flex items-center gap-2 px-2 py-2 hover:bg-gray-100 cursor-pointer text-xs"
+                                    onClick={() => handleStatusUpdate(user.telegram_user_id, "ban")}
+                                  >
+                                    <Image src="/disband.png" alt="Ban" width={12} height={12} />
+                                    Ban
+                                  </div>
+                                </>
+                              )}
+                              {isSuspended && (
+                                <div
+                                  className="flex items-center gap-2 px-2 py-2 hover:bg-gray-100 cursor-pointer text-xs"
+                                  onClick={() => handleStatusUpdate(user.telegram_user_id, "active")}
+                                >
+                                  <Image src="/resume2.png" alt="Resume" width={12} height={12} />
+                                  Resume
+                                </div>
+                              )}
+                              {isDisband && <div className="text-xs px-2 py-2 text-gray-500">Banned</div>}
+                            </div>
                           )}
                         </div>
                       </div>
-                      <div>{user.username}</div>
-                      <div>{user.level_name}</div>
-                      <div className="flex items-center gap-2">
-                        <Image src="/logo.png" alt="Coin" width={16} height={16} />
-                        {user.coins_earned}
-                      </div>
-                      <div>{user.invite_count}</div>
-                      <div>{formatDate(user.registration_date)}</div>
-                      <div>
-                        <span
-                          className={`px-2 py-1 rounded text-xs ${
-                            user.status === "active"
-                              ? "bg-[#E7F7EF] text-[#0CAF60]"
-                              : user.status === "suspended"
-                              ? "bg-[#FFD8D8] text-[#FF0000]"
-                              : user.status === "disband"
-                              ? "bg-[#D8CBFD] text-[#551DEC]"
-                              : "bg-gray-500 text-white"
-                          }`}
-                        >
-                          {user.status}
-                        </span>
-                      </div>
-                      <div className="relative">
-                        <div
-                          className="flex items-center gap-2 cursor-pointer"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleActionClick(index);
-                          }}
-                        >
-                          <span className="text-xs">Action</span>
-                          <Image src="/dropdown.png" alt="Dropdown" width={16} height={16} />
-                        </div>
-                        {showActionDropdown === index && (
-                          <div className="absolute right-0 mt-2 w-32 bg-white rounded-lg shadow-lg z-10 text-black p-2">
-                            <div className="flex items-center gap-2 px-2 py-2 hover:bg-gray-100 cursor-pointer text-xs">
-                              <Image src="/edit.png" alt="Edit" width={12} height={12} />
-                              Edit
-                            </div>
-                            <div
-                              className="flex items-center gap-2 px-2 py-2 hover:bg-gray-100 cursor-pointer text-xs"
-                              onClick={handleDelete}
-                            >
-                              <Image src="/deletered.png" alt="Delete" width={12} height={12} />
-                              Delete
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))
+                    );
+                  })
               )}
 
-              {/* Divider with Pagination */}
               <div className="relative mt-6">
                 <div className="border-t border-white/20"></div>
                 <div className="flex flex-col sm:flex-row justify-between items-center mt-4 text-white">
@@ -438,9 +437,12 @@ const Users: React.FC = () => {
           </div>
         </div>
 
-        {/* Overlay */}
-        {showOverlay && selectedUser && (
-          <ProfileOverlay user={selectedUser} onClose={() => setShowOverlay(false)} />
+        {showOverlay && (
+          <ProfileOverlay
+            user={filteredData.find((u) => u.telegram_user_id === selectedUserId)!}
+            onClose={() => setShowOverlay(false)}
+            onStatusUpdate={handleStatusUpdate}
+          />
         )}
       </div>
     </div>
