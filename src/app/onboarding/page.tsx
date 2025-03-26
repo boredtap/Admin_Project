@@ -31,7 +31,7 @@ const Onboarding = () => {
     <div className="flex min-h-screen w-full items-center justify-center bg-[#19191A] p-6 sm:p-8">
       {loading && (
         <div className="flex w-full max-w-[600px] flex-col items-center justify-center text-center">
-          <Image src={process.env.PUBLIC_URL + "/logo.png"} alt="Logo" width={300} height={300} className="sm:w-80 sm:h-80" />
+          <Image src="/logo.png" alt="Logo" width={300} height={300} className="sm:w-80 sm:h-80" />
           <h1 className="mt-8 text-4xl text-white font-bold sm:text-3xl">BoredTap App</h1>
           <div className="mt-6 h-4 w-full max-w-md overflow-hidden rounded-full bg-gray-200">
             <div className="h-full w-0 animate-[load_2s_linear_infinite] bg-orange-400" />
