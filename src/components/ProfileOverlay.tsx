@@ -383,7 +383,7 @@ const ProfileOverlay: React.FC<ProfileOverlayProps> = ({ onClose, user }) => {
                 }}
               >
                 <Image
-                  src="/suspend.png"
+                  src="/disband.png"
                   alt="Suspend"
                   width={20}
                   height={20}
@@ -399,7 +399,7 @@ const ProfileOverlay: React.FC<ProfileOverlayProps> = ({ onClose, user }) => {
                 }}
               >
                 <Image
-                  src="/ban.png"
+                  src="/disband.png"
                   alt="Ban"
                   width={20}
                   height={20}
@@ -418,7 +418,7 @@ const ProfileOverlay: React.FC<ProfileOverlayProps> = ({ onClose, user }) => {
               }}
             >
               <Image
-                src="/resume.png"
+                src="/resume2.png"
                 alt="Resume"
                 width={20}
                 height={20}
@@ -454,10 +454,10 @@ const ProfileOverlay: React.FC<ProfileOverlayProps> = ({ onClose, user }) => {
               <Image
                 src={
                   showActionOverlay === "ban"
-                    ? "/ban.png"
+                    ? "/disband2.png"
                     : showActionOverlay === "suspend"
-                    ? "/suspend.png"
-                    : "/resume.png"
+                    ? "/disband2.png"
+                    : "/resume2.png"
                 }
                 alt={`${showActionOverlay} Icon`}
                 width={30}

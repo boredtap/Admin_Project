@@ -1,3 +1,5 @@
+// src/app/boosts/page.tsx
+
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
@@ -13,26 +15,26 @@ interface Boost {
   id: string;
   name: string;
   description: string;
-  level: number;
+  level: number | string;
   effect: string;
-  upgrade_cost: string;
+  upgrade_cost: string | number;
   condition: string;
 }
 
 interface BoostFormData {
-    id?: string;
-    name: string;
-    description: string;
-    level: string; // Changed from number to string to match CreateBoosterOverlay
-    upgradeCost: string;
-    effect: string;
-    condition: string;
-    image: File | null; // Added to match CreateBoosterOverlay
-  }
+  id?: string;
+  name: string;
+  description: string;
+  level: string;
+  upgradeCost: string;
+  effect: string;
+  condition: string;
+  image: File | null;
+}
 
 const Boosts: React.FC = () => {
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
-  const [activeTab, setActiveTab] = useState<"Extra Boosters" | "Streak">("Extra Boosters");
+  const [activeTab, setActiveTab] = useState<"Boost" | "Multiplier" | "Recharging Speed" | "Autobot Tapping">("Boost");
   const [showActionDropdown, setShowActionDropdown] = useState<number | null>(null);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [showDeleteOverlay, setShowDeleteOverlay] = useState(false);
@@ -42,11 +44,15 @@ const Boosts: React.FC = () => {
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [currentPage, setCurrentPage] = useState(1);
   const [boostsData, setBoostsData] = useState<{
-    "Extra Boosters": Boost[];
-    "Streak": Boost[];
+    "Boost": Boost[];
+    "Multiplier": Boost[];
+    "Recharging Speed": Boost[];
+    "Autobot Tapping": Boost[];
   }>({
-    "Extra Boosters": [],
-    "Streak": [],
+    "Boost": [],
+    "Multiplier": [],
+    "Recharging Speed": [],
+    "Autobot Tapping": [],
   });
   const [filters, setFilters] = useState<{
     level: { [key: string]: boolean };
@@ -111,10 +117,16 @@ const Boosts: React.FC = () => {
       });
       if (!response.ok) throw new Error("Failed to fetch boosts");
       const data: Boost[] = await response.json();
-      setBoostsData({
-        "Extra Boosters": data,
-        "Streak": [], // Placeholder for future "Streak" boosts if API is added
-      });
+
+      // Segment the boosts based on their names
+      const segmentedBoosts = {
+        "Boost": data.filter(boost => boost.name.toLowerCase() === "boost"),
+        "Multiplier": data.filter(boost => boost.name.toLowerCase() === "multiplier"),
+        "Recharging Speed": data.filter(boost => boost.name.toLowerCase() === "recharging speed"),
+        "Autobot Tapping": data.filter(boost => boost.name.toLowerCase() === "auto-bot tapping")
+      };
+      
+      setBoostsData(segmentedBoosts);
     } catch (err) {
       const errorMessage = (err as Error).message;
       setError(errorMessage);
@@ -129,6 +141,7 @@ const Boosts: React.FC = () => {
     fetchBoosts();
   }, [fetchBoosts]);
 
+  // Rest of the functions remain largely the same, just updating type references
   const handleFilterChange = (category: "level", value: string) => {
     setFilters((prev) => ({
       ...prev,
@@ -148,7 +161,7 @@ const Boosts: React.FC = () => {
 
   const handleEditUpgradeCost = async (boost: Boost) => {
     setShowActionDropdown(null);
-    const newCost = prompt("Enter new upgrade cost:", boost.upgrade_cost);
+    const newCost = prompt("Enter new upgrade cost:", boost.upgrade_cost.toString());
     if (newCost) {
       try {
         const token = localStorage.getItem("access_token");
@@ -238,7 +251,7 @@ const Boosts: React.FC = () => {
                 {/* Tabs and Buttons */}
                 <div className="flex justify-between items-center mb-4">
                   <div className="flex gap-4">
-                    {["Extra Boosters", "Streak"].map((tab) => (
+                    {["Boost", "Multiplier", "Recharging Speed", "Autobot Tapping"].map((tab) => (
                       <span
                         key={tab}
                         className={`text-xs cursor-pointer pb-1 ${
@@ -268,10 +281,8 @@ const Boosts: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Divider Under Tabs */}
+                {/* Rest of the JSX remains the same */}
                 <div className="border-t border-white/20 mb-4"></div>
-
-                {/* Search, Date, Delete */}
                 <div className="flex justify-between items-center mb-4">
                   <div className="flex items-center bg-[#19191A] rounded-lg w-full max-w-[500px] h-[54px] p-4 relative sm:h-10">
                     <Image src="/search.png" alt="Search" width={16} height={16} />
@@ -322,11 +333,7 @@ const Boosts: React.FC = () => {
                     </button>
                   </div>
                 </div>
-
-                {/* Divider */}
                 <div className="border-t border-white/20 mb-4"></div>
-
-                {/* Table Headers */}
                 <div className="grid grid-cols-[40px_2fr_2fr_1fr_1fr_1fr_1fr_1fr] gap-3 text-[#AEAAAA] text-xs font-medium mb-2">
                   <div />
                   <div>Name</div>
@@ -337,11 +344,7 @@ const Boosts: React.FC = () => {
                   <div>Condition</div>
                   <div>Action</div>
                 </div>
-
-                {/* Divider */}
                 <div className="border-t border-white/20 mb-4"></div>
-
-                {/* Table Content */}
                 {filteredData.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage).map((boost, index) => (
                   <div
                     key={boost.id}
@@ -395,8 +398,6 @@ const Boosts: React.FC = () => {
                     </div>
                   </div>
                 ))}
-
-                {/* Divider with Pagination */}
                 <div className="relative mt-6">
                   <div className="border-t border-white/20"></div>
                   <div className="flex flex-col sm:flex-row justify-between items-center mt-4 text-white">
@@ -455,7 +456,6 @@ const Boosts: React.FC = () => {
           </div>
         </div>
 
-        {/* Overlays */}
         {showCreateBoosterOverlay && (
           <CreateBoosterOverlay
             onClose={() => {

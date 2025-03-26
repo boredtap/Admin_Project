@@ -1,8 +1,10 @@
+// src/components/CreateNewReward.tsx
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import { API_BASE_URL } from "@/config/api";
+import { User } from "./UserProfileOverlay";
 
-interface RewardFormData {
+export interface RewardFormData {
   id?: string;
   rewardTitle: string;
   rewardAmount: string;
@@ -18,6 +20,7 @@ interface CreateNewRewardProps {
   onClose: () => void;
   rewardToEdit: RewardFormData | null;
   onSubmit: (rewardData: RewardFormData) => Promise<void>;
+  prefilledUser?: User | null;
 }
 
 const clans = ["TON Station", "HiddenCode", "h2o", "Tapper Legends"];
@@ -36,17 +39,23 @@ const levels = [
 ];
 const beneficiaryTypes = ["All Users", "Clan(s)", "Level(s)", "Specific User(s)"];
 
-const CreateNewReward: React.FC<CreateNewRewardProps> = ({ onClose, rewardToEdit, onSubmit }) => {
+const CreateNewReward: React.FC<CreateNewRewardProps> = ({
+  onClose,
+  rewardToEdit,
+  onSubmit,
+  prefilledUser,
+}) => {
   const [formData, setFormData] = useState<RewardFormData>({
-    rewardTitle: "",
+    rewardTitle: prefilledUser ? "Admin Reward" : "",
     rewardAmount: "",
     expiryDate: new Date(),
-    beneficiaryType: "",
+    beneficiaryType: prefilledUser ? "Specific User(s)" : "",
     selectedClans: [],
     selectedLevels: [],
-    specificUsers: "",
+    specificUsers: prefilledUser?.telegram_user_id || prefilledUser?.username || "",
     image: null,
   });
+  const [defaultImageUrl] = useState(prefilledUser ? "/logo.png" : null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [showDropdown, setShowDropdown] = useState({
@@ -77,8 +86,19 @@ const CreateNewReward: React.FC<CreateNewRewardProps> = ({ onClose, rewardToEdit
         specificUsers: rewardToEdit.beneficiaryType === "specific_users" ? rewardToEdit.specificUsers || "" : "",
         image: null,
       });
+    } else if (prefilledUser) {
+      setFormData({
+        rewardTitle: "Admin Reward",
+        rewardAmount: "",
+        expiryDate: new Date(),
+        beneficiaryType: "Specific User(s)",
+        selectedClans: [],
+        selectedLevels: [],
+        specificUsers: prefilledUser.telegram_user_id || prefilledUser.username || "",
+        image: null,
+      });
     }
-  }, [rewardToEdit]);
+  }, [rewardToEdit, prefilledUser]);
 
   const getBeneficiaryTypeReverse = (beneficiary: string): string => {
     switch (beneficiary) {
@@ -232,7 +252,7 @@ const CreateNewReward: React.FC<CreateNewRewardProps> = ({ onClose, rewardToEdit
       setError("Please enter at least one user.");
       return false;
     }
-    if (!formData.image && !rewardToEdit) {
+    if (!formData.image && !rewardToEdit && !prefilledUser) {
       setError("Please upload an image for the reward.");
       return false;
     }
@@ -242,41 +262,75 @@ const CreateNewReward: React.FC<CreateNewRewardProps> = ({ onClose, rewardToEdit
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-
+  
+    // Validate form data before proceeding
     if (!validateFormData()) return;
-
+  
+    // Retrieve authentication token
     const token = localStorage.getItem("access_token");
     if (!token) {
       setError("No authentication token found. Please sign in.");
       return;
     }
-
+  
     // Construct query parameters
     const queryParams = new URLSearchParams({
       reward_title: formData.rewardTitle,
-      reward: parseInt(formData.rewardAmount).toString(), // Ensure integer
-      expiry_date: formData.expiryDate ? formData.expiryDate.toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
+      reward: parseInt(formData.rewardAmount).toString(),
+      expiry_date: formData.expiryDate
+        ? formData.expiryDate.toISOString().split("T")[0]
+        : new Date().toISOString().split("T")[0],
       beneficiary: getBeneficiaryType(formData.beneficiaryType),
     }).toString();
-
-    // Construct form data for optional fields and image
+  
+    // Initialize FormData
     const formDataBody = new FormData();
+  
+    // Handle beneficiary types
     if (formData.beneficiaryType === "Clan(s)") {
       formData.selectedClans.forEach((clan) => formDataBody.append("clan", clan));
     } else if (formData.beneficiaryType === "Level(s)") {
       formData.selectedLevels.forEach((level) => formDataBody.append("level", level));
     } else if (formData.beneficiaryType === "Specific User(s)") {
-      formDataBody.append("specific_users", formData.specificUsers);
+      const userId = formData.specificUsers.trim();
+      // Validate that specific_users is a numeric string
+      if (!/^\d+$/.test(userId)) {
+        setError("Please enter a valid numeric Telegram ID for specific users.");
+        return;
+      }
+      formDataBody.append("specific_users", userId);
     }
+  
+    // Handle reward image
     if (formData.image) {
       formDataBody.append("reward_image", formData.image);
+    } else if (prefilledUser && !formData.image) {
+      try {
+        const response = await fetch("/logo.png");
+        if (!response.ok) {
+          console.warn("Default image fetch failed, proceeding without image.");
+        } else {
+          const blob = await response.blob();
+          formDataBody.append("reward_image", blob, "logo.png");
+        }
+      } catch (imgErr) {
+        console.warn("Failed to load default image, proceeding without it:", imgErr);
+      }
     }
-
+  
+    // Log request details for debugging
+    console.log("Submitting to URL:", `${API_BASE_URL}/admin/reward/create_reward?${queryParams}`);
+    console.log("FormData contents:");
+    for (const [key, value] of formDataBody.entries()) {
+      console.log(`${key}:`, value);
+    }
+  
+    // Send the request
     try {
       const url = rewardToEdit
         ? `${API_BASE_URL}/admin/reward/update_reward?reward_id=${rewardToEdit.id}`
         : `${API_BASE_URL}/admin/reward/create_reward?${queryParams}`;
-
+  
       const response = await fetch(url, {
         method: rewardToEdit ? "PUT" : "POST",
         headers: {
@@ -285,12 +339,22 @@ const CreateNewReward: React.FC<CreateNewRewardProps> = ({ onClose, rewardToEdit
         },
         body: formDataBody,
       });
-
+  
+      const responseText = await response.text();
+      console.log("Server response:", response.status, responseText);
+  
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || `Failed to ${rewardToEdit ? "update" : "create"} reward (Status: ${response.status})`);
+        let errorMessage = `Failed to ${rewardToEdit ? "update" : "create"} reward (Status: ${response.status})`;
+        try {
+          const errorData = JSON.parse(responseText);
+          errorMessage = errorData.message || errorMessage;
+        } catch {
+          errorMessage += ` - Server response: ${responseText}`;
+        }
+        throw new Error(errorMessage);
       }
-
+  
+      // On success, proceed with submission and show success overlay
       await onSubmit(formData);
       setShowSuccessOverlay(true);
     } catch (err) {
@@ -301,6 +365,18 @@ const CreateNewReward: React.FC<CreateNewRewardProps> = ({ onClose, rewardToEdit
 
   const renderBeneficiaryField = () => {
     if (!formData.beneficiaryType || formData.beneficiaryType === "All Users") return null;
+
+    if (prefilledUser) {
+      return (
+        <input
+          type="text"
+          name="specificUsers"
+          value={formData.specificUsers}
+          readOnly
+          className="w-full h-12 bg-[#19191A] border border-[#363638] rounded-md px-3 text-white text-xs opacity-50 cursor-not-allowed"
+        />
+      );
+    }
 
     switch (formData.beneficiaryType) {
       case "Clan(s)":
@@ -374,8 +450,11 @@ const CreateNewReward: React.FC<CreateNewRewardProps> = ({ onClose, rewardToEdit
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex justify-center items-center z-50">
-      <div className="w-full max-w-xl bg-[#202022] rounded-lg p-6 text-orange-400 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/70 flex justify-center items-center z-50" onClick={onClose}>
+      <div
+        className="w-full max-w-xl bg-[#202022] rounded-lg p-6 text-orange-400 max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()} // Prevent clicks inside from closing the overlay
+      >
         <div className="relative text-center py-5">
           <h2 className="text-xl font-bold">{rewardToEdit ? "Update Reward" : "Create New Reward"}</h2>
           <button className="absolute right-0 top-1/2 -translate-y-1/2" onClick={onClose}>
@@ -399,6 +478,7 @@ const CreateNewReward: React.FC<CreateNewRewardProps> = ({ onClose, rewardToEdit
               value={formData.rewardTitle}
               onChange={handleInputChange}
               className="w-full h-10 bg-[#19191A] border border-[#363638] rounded-md px-3 text-white text-xs"
+              readOnly={!!prefilledUser}
               required
             />
           </div>
@@ -461,6 +541,7 @@ const CreateNewReward: React.FC<CreateNewRewardProps> = ({ onClose, rewardToEdit
                 value={formData.beneficiaryType}
                 onChange={(e) => handleBeneficiarySelection(e.target.value)}
                 className="w-full h-12 bg-[#19191A] border border-[#363638] rounded-md px-3 text-white text-xs"
+                disabled={!!prefilledUser}
                 required
               >
                 <option value="">Select beneficiary type</option>
@@ -482,24 +563,27 @@ const CreateNewReward: React.FC<CreateNewRewardProps> = ({ onClose, rewardToEdit
           <div>
             <label className="block text-xs mb-1.5">Upload Reward Image</label>
             <div className="h-32 bg-[#19191A] border border-dashed border-[#363638] rounded-md flex flex-col items-center justify-center p-6">
-              <Image src="/upload.png" alt="Upload" width={24} height={24} className="mb-2" />
-              <p className="text-xs text-gray-400">
-                Drop your image here or{" "}
-                <label className="text-orange-400 cursor-pointer">
-                  <input
-                    type="file"
-                    accept=".jpg,.jpeg,.png"
-                    onChange={handleImageUpload}
-                    className="hidden"
-                  />
-                  Browse
-                </label>
-              </p>
-              <p className="text-xs text-gray-400">Support: jpg, jpeg, png</p>
-              {formData.image && (
-                <div className="mt-2">
-                  <Image src={URL.createObjectURL(formData.image)} alt="Preview" width={50} height={50} />
-                </div>
+              {formData.image ? (
+                <Image src={URL.createObjectURL(formData.image)} alt="Preview" width={50} height={50} />
+              ) : defaultImageUrl ? (
+                <Image src={defaultImageUrl} alt="Default" width={50} height={50} />
+              ) : (
+                <>
+                  <Image src="/upload.png" alt="Upload" width={24} height={24} className="mb-2" />
+                  <p className="text-xs text-gray-400">
+                    Drop your image here or{" "}
+                    <label className="text-orange-400 cursor-pointer">
+                      <input
+                        type="file"
+                        accept=".jpg,.jpeg,.png"
+                        onChange={handleImageUpload}
+                        className="hidden"
+                      />
+                      Browse
+                    </label>
+                  </p>
+                  <p className="text-xs text-gray-400">Support: jpg, jpeg, png</p>
+                </>
               )}
             </div>
           </div>
@@ -513,8 +597,11 @@ const CreateNewReward: React.FC<CreateNewRewardProps> = ({ onClose, rewardToEdit
         </form>
 
         {showSuccessOverlay && (
-          <div className="fixed inset-0 bg-black/70 flex justify-center items-center z-50">
-            <div className="bg-[#202022] rounded-lg p-6 text-white w-80 text-center">
+          <div className="fixed inset-0 bg-black/70 flex justify-center items-center z-50" onClick={() => setShowSuccessOverlay(false)}>
+            <div
+              className="bg-[#202022] rounded-lg p-6 text-white w-80 text-center"
+              onClick={(e) => e.stopPropagation()} // Prevent success overlay from closing on inner clicks
+            >
               <Image src="/success.png" alt="Success" width={100} height={100} className="mx-auto mb-4" />
               <h2 className="text-xl font-bold mb-4">Success!</h2>
               <p className="text-xs mb-6">

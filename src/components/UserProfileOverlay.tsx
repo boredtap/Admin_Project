@@ -1,8 +1,10 @@
+// src/components/UserProfileOverlay.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import { API_BASE_URL } from "@/config/api";
+import CreateNewReward, { RewardFormData } from "./CreateNewReward"; // Import RewardFormData
 
 export interface Achievement {
   total_coin: number; // Matches backend field name
@@ -39,8 +41,9 @@ interface UserProfileOverlayProps {
 }
 
 const UserProfileOverlay: React.FC<UserProfileOverlayProps> = ({ onClose, user }) => {
-  const [profile, setProfile] = useState<User | null>(null);
-  const [error, setError] = useState<string | null>(null);
+    const [profile, setProfile] = useState<User | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [showRewardOverlay, setShowRewardOverlay] = useState(false); // State for reward overlay
 
   useEffect(() => {
     if (user?.telegram_user_id) {
@@ -76,6 +79,13 @@ const UserProfileOverlay: React.FC<UserProfileOverlayProps> = ({ onClose, user }
   }, [user]);
 
   const displayData = profile || user || {};
+
+  const handleRewardSubmit = async (rewardData: RewardFormData) => {
+    // Logic to handle reward submission (could call an API or update state)
+    console.log("Reward submitted:", rewardData);
+    setShowRewardOverlay(false); // Close overlay on success
+  };
+
 
   if (error) {
     return (
@@ -222,16 +232,25 @@ const UserProfileOverlay: React.FC<UserProfileOverlayProps> = ({ onClose, user }
         </div>
 
         <div className="flex justify-center gap-4 mt-6">
-          {/* <button className="flex items-center gap-2 bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 text-xs">
-            <Image src="/suspend.png" alt="Suspend" width={20} height={20} />
-            Suspend
-          </button> */}
-          <button className="flex items-center gap-2 bg-[#0CAF60] text-white py-2 px-4 rounded-lg hover:bg-green-700 text-xs">
+          <button
+            className="flex items-center gap-2 bg-[#0CAF60] text-white py-2 px-4 rounded-lg hover:bg-green-700 text-xs"
+            onClick={() => setShowRewardOverlay(true)} // Open reward overlay
+          >
             <Image src="/add2.png" alt="Reward" width={20} height={20} />
             Reward
           </button>
         </div>
       </div>
+
+      {/* Reward Overlay */}
+      {showRewardOverlay && (
+        <CreateNewReward
+          onClose={() => setShowRewardOverlay(false)}
+          rewardToEdit={null} // No editing, creating new reward
+          onSubmit={handleRewardSubmit}
+          prefilledUser={displayData} // Pass user data for pre-filling
+        />
+      )}
     </div>
   );
 };
