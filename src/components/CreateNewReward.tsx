@@ -1,4 +1,3 @@
-// src/components/CreateNewReward.tsx
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import { API_BASE_URL } from "@/config/api";
@@ -13,6 +12,7 @@ export interface RewardFormData {
   selectedClans: string[];
   selectedLevels: string[];
   specificUsers: string;
+  telegramUserId?: string;
   image: File | null;
 }
 
@@ -23,20 +23,6 @@ interface CreateNewRewardProps {
   prefilledUser?: User | null;
 }
 
-const clans = ["TON Station", "HiddenCode", "h2o", "Tapper Legends"];
-const levels = [
-  "all_users",
-  "novice",
-  "explorer",
-  "apprentice",
-  "warrior",
-  "master",
-  "champion",
-  "tactician",
-  "specialist",
-  "conqueror",
-  "legend",
-];
 const beneficiaryTypes = ["All Users", "Clan(s)", "Level(s)", "Specific User(s)"];
 
 const CreateNewReward: React.FC<CreateNewRewardProps> = ({
@@ -52,9 +38,12 @@ const CreateNewReward: React.FC<CreateNewRewardProps> = ({
     beneficiaryType: prefilledUser ? "Specific User(s)" : "",
     selectedClans: [],
     selectedLevels: [],
-    specificUsers: prefilledUser?.telegram_user_id || prefilledUser?.username || "",
+    specificUsers: prefilledUser?.username || "",
+    telegramUserId: prefilledUser?.telegram_user_id || "",
     image: null,
   });
+  const [clans, setClans] = useState<string[]>([]);
+  const [levels, setLevels] = useState<string[]>([]);
   const [defaultImageUrl] = useState(prefilledUser ? "/logo.png" : null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -65,6 +54,7 @@ const CreateNewReward: React.FC<CreateNewRewardProps> = ({
   });
   const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -81,9 +71,10 @@ const CreateNewReward: React.FC<CreateNewRewardProps> = ({
         rewardAmount: rewardToEdit.rewardAmount,
         expiryDate: rewardToEdit.expiryDate ? new Date(rewardToEdit.expiryDate) : new Date(),
         beneficiaryType: getBeneficiaryTypeReverse(rewardToEdit.beneficiaryType),
-        selectedClans: rewardToEdit.beneficiaryType === "clan" ? [rewardToEdit.selectedClans[0] || ""] : [],
-        selectedLevels: rewardToEdit.beneficiaryType === "level" ? [rewardToEdit.selectedLevels[0] || ""] : [],
-        specificUsers: rewardToEdit.beneficiaryType === "specific_users" ? rewardToEdit.specificUsers || "" : "",
+        selectedClans: rewardToEdit.selectedClans || [],
+        selectedLevels: rewardToEdit.selectedLevels || [],
+        specificUsers: rewardToEdit.specificUsers || "",
+        telegramUserId: rewardToEdit.telegramUserId || "",
         image: null,
       });
     } else if (prefilledUser) {
@@ -94,11 +85,48 @@ const CreateNewReward: React.FC<CreateNewRewardProps> = ({
         beneficiaryType: "Specific User(s)",
         selectedClans: [],
         selectedLevels: [],
-        specificUsers: prefilledUser.telegram_user_id || prefilledUser.username || "",
+        specificUsers: prefilledUser.username || "",
+        telegramUserId: prefilledUser.telegram_user_id || "",
         image: null,
       });
     }
   }, [rewardToEdit, prefilledUser]);
+
+  useEffect(() => {
+    const fetchClansAndLevels = async () => {
+      const token = localStorage.getItem("access_token");
+      if (!token) {
+        setError("No authentication token found. Please sign in.");
+        return;
+      }
+
+      try {
+        const [clanResponse, levelResponse] = await Promise.all([
+          fetch(`${API_BASE_URL}/admin/clan/get_clans?category=all_clans&page=1&page_size=20`, {
+            headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+          }),
+          fetch(`${API_BASE_URL}/admin/levels/get_levels`, {
+            headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+          }),
+        ]);
+
+        if (clanResponse.ok) {
+          const data = await clanResponse.json();
+          setClans(data.map((clan: { name: string }) => clan.name));
+        }
+
+        if (levelResponse.ok) {
+          const data = await levelResponse.json();
+          setLevels(data.map((level: { name: string }) => level.name.toLowerCase()));
+        }
+      } catch (err) {
+        setError((err as Error).message);
+        console.error("Error fetching clans or levels:", err);
+      }
+    };
+
+    fetchClansAndLevels();
+  }, []);
 
   const getBeneficiaryTypeReverse = (beneficiary: string): string => {
     switch (beneficiary) {
@@ -131,17 +159,19 @@ const CreateNewReward: React.FC<CreateNewRewardProps> = ({
       beneficiaryType: type,
       selectedClans: [],
       selectedLevels: [],
-      specificUsers: "",
+      specificUsers: prefilledUser ? prev.specificUsers : "",
+      telegramUserId: prefilledUser ? prev.telegramUserId : "",
     }));
     setShowDropdown((prev) => ({ ...prev, beneficiaries: false }));
   };
 
   const toggleDropdown = (field: keyof typeof showDropdown) => {
-    setShowDropdown((prev) => {
-      const newState = { beneficiaries: false, clans: false, levels: false };
-      newState[field] = !prev[field];
-      return newState;
-    });
+    setShowDropdown((prev) => ({
+      beneficiaries: false,
+      clans: false,
+      levels: false,
+      [field]: !prev[field],
+    }));
   };
 
   const handleCheckboxChange = (field: "selectedClans" | "selectedLevels", item: string) => {
@@ -155,9 +185,7 @@ const CreateNewReward: React.FC<CreateNewRewardProps> = ({
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setFormData((prev) => ({ ...prev, image: file }));
-    }
+    if (file) setFormData((prev) => ({ ...prev, image: file }));
   };
 
   const handleDateChange = (date: Date) => {
@@ -248,8 +276,8 @@ const CreateNewReward: React.FC<CreateNewRewardProps> = ({
       setError("Please select at least one level.");
       return false;
     }
-    if (formData.beneficiaryType === "Specific User(s)" && !formData.specificUsers.trim()) {
-      setError("Please enter at least one user.");
+    if (formData.beneficiaryType === "Specific User(s)" && !formData.telegramUserId) {
+      setError("Please enter a Telegram User ID.");
       return false;
     }
     if (!formData.image && !rewardToEdit && !prefilledUser) {
@@ -262,18 +290,20 @@ const CreateNewReward: React.FC<CreateNewRewardProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-  
-    // Validate form data before proceeding
-    if (!validateFormData()) return;
-  
-    // Retrieve authentication token
+    setIsSubmitting(true);
+
+    if (!validateFormData()) {
+      setIsSubmitting(false);
+      return;
+    }
+
     const token = localStorage.getItem("access_token");
     if (!token) {
       setError("No authentication token found. Please sign in.");
+      setIsSubmitting(false);
       return;
     }
-  
-    // Construct query parameters
+
     const queryParams = new URLSearchParams({
       reward_title: formData.rewardTitle,
       reward: parseInt(formData.rewardAmount).toString(),
@@ -281,56 +311,37 @@ const CreateNewReward: React.FC<CreateNewRewardProps> = ({
         ? formData.expiryDate.toISOString().split("T")[0]
         : new Date().toISOString().split("T")[0],
       beneficiary: getBeneficiaryType(formData.beneficiaryType),
-    }).toString();
-  
-    // Initialize FormData
+    });
+
     const formDataBody = new FormData();
-  
-    // Handle beneficiary types
+
     if (formData.beneficiaryType === "Clan(s)") {
       formData.selectedClans.forEach((clan) => formDataBody.append("clan", clan));
     } else if (formData.beneficiaryType === "Level(s)") {
       formData.selectedLevels.forEach((level) => formDataBody.append("level", level));
-    } else if (formData.beneficiaryType === "Specific User(s)") {
-      const userId = formData.specificUsers.trim();
-      // Validate that specific_users is a numeric string
-      if (!/^\d+$/.test(userId)) {
-        setError("Please enter a valid numeric Telegram ID for specific users.");
-        return;
-      }
-      formDataBody.append("specific_users", userId);
+    } else if (formData.beneficiaryType === "Specific User(s)" && formData.telegramUserId) {
+      formDataBody.append("specific_users", formData.telegramUserId);
     }
-  
-    // Handle reward image
+
     if (formData.image) {
       formDataBody.append("reward_image", formData.image);
     } else if (prefilledUser && !formData.image) {
       try {
         const response = await fetch("/logo.png");
-        if (!response.ok) {
-          console.warn("Default image fetch failed, proceeding without image.");
-        } else {
+        if (response.ok) {
           const blob = await response.blob();
           formDataBody.append("reward_image", blob, "logo.png");
         }
       } catch (imgErr) {
-        console.warn("Failed to load default image, proceeding without it:", imgErr);
+        console.warn("Failed to load default image:", imgErr);
       }
     }
-  
-    // Log request details for debugging
-    console.log("Submitting to URL:", `${API_BASE_URL}/admin/reward/create_reward?${queryParams}`);
-    console.log("FormData contents:");
-    for (const [key, value] of formDataBody.entries()) {
-      console.log(`${key}:`, value);
-    }
-  
-    // Send the request
+
     try {
       const url = rewardToEdit
-        ? `${API_BASE_URL}/admin/reward/update_reward?reward_id=${rewardToEdit.id}`
-        : `${API_BASE_URL}/admin/reward/create_reward?${queryParams}`;
-  
+        ? `${API_BASE_URL}/admin/reward/update_reward?reward_id=${rewardToEdit.id}&${queryParams.toString()}`
+        : `${API_BASE_URL}/admin/reward/create_reward?${queryParams.toString()}`;
+
       const response = await fetch(url, {
         method: rewardToEdit ? "PUT" : "POST",
         headers: {
@@ -339,27 +350,19 @@ const CreateNewReward: React.FC<CreateNewRewardProps> = ({
         },
         body: formDataBody,
       });
-  
-      const responseText = await response.text();
-      console.log("Server response:", response.status, responseText);
-  
+
       if (!response.ok) {
-        let errorMessage = `Failed to ${rewardToEdit ? "update" : "create"} reward (Status: ${response.status})`;
-        try {
-          const errorData = JSON.parse(responseText);
-          errorMessage = errorData.message || errorMessage;
-        } catch {
-          errorMessage += ` - Server response: ${responseText}`;
-        }
-        throw new Error(errorMessage);
+        const errorText = await response.text();
+        throw new Error(`Failed to ${rewardToEdit ? "update" : "create"} reward: ${errorText}`);
       }
-  
-      // On success, proceed with submission and show success overlay
+
       await onSubmit(formData);
       setShowSuccessOverlay(true);
     } catch (err) {
       setError((err as Error).message);
       console.error("Reward submission error:", err);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -437,10 +440,16 @@ const CreateNewReward: React.FC<CreateNewRewardProps> = ({
         return (
           <input
             type="text"
-            name="specificUsers"
-            placeholder="Enter users name (comma-separated)"
-            value={formData.specificUsers}
-            onChange={handleInputChange}
+            name="telegramUserId"
+            placeholder="Enter Telegram ID"
+            value={formData.telegramUserId || ""}
+            onChange={(e) =>
+              setFormData((prev) => ({
+                ...prev,
+                telegramUserId: e.target.value,
+                specificUsers: e.target.value,
+              }))
+            }
             className="w-full h-12 bg-[#19191A] border border-[#363638] rounded-md px-3 text-white text-xs"
           />
         );
@@ -453,7 +462,7 @@ const CreateNewReward: React.FC<CreateNewRewardProps> = ({
     <div className="fixed inset-0 bg-black/70 flex justify-center items-center z-50" onClick={onClose}>
       <div
         className="w-full max-w-xl bg-[#202022] rounded-lg p-6 text-orange-400 max-h-[90vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()} // Prevent clicks inside from closing the overlay
+        onClick={(e) => e.stopPropagation()}
       >
         <div className="relative text-center py-5">
           <h2 className="text-xl font-bold">{rewardToEdit ? "Update Reward" : "Create New Reward"}</h2>
@@ -590,9 +599,10 @@ const CreateNewReward: React.FC<CreateNewRewardProps> = ({
 
           <button
             type="submit"
-            className="w-80 h-14 bg-white text-black rounded-md font-bold text-sm hover:bg-orange-400 mx-auto block"
+            className="w-80 h-14 bg-white text-black rounded-md font-bold text-sm hover:bg-orange-400 mx-auto block disabled:opacity-50"
+            disabled={isSubmitting}
           >
-            Submit
+            {isSubmitting ? "Submitting..." : "Submit"}
           </button>
         </form>
 
@@ -600,7 +610,7 @@ const CreateNewReward: React.FC<CreateNewRewardProps> = ({
           <div className="fixed inset-0 bg-black/70 flex justify-center items-center z-50" onClick={() => setShowSuccessOverlay(false)}>
             <div
               className="bg-[#202022] rounded-lg p-6 text-white w-80 text-center"
-              onClick={(e) => e.stopPropagation()} // Prevent success overlay from closing on inner clicks
+              onClick={(e) => e.stopPropagation()}
             >
               <Image src="/success.png" alt="Success" width={100} height={100} className="mx-auto mb-4" />
               <h2 className="text-xl font-bold mb-4">Success!</h2>

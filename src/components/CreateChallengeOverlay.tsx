@@ -20,30 +20,18 @@ interface CreateChallengeOverlayProps {
   onClose: () => void;
   challengeToEdit: ChallengeFormData | null;
   onSubmit: (challengeData: ChallengeFormData) => Promise<void>;
-  isEditing: boolean;
+  clans: string[];
+  levels: string[];
 }
 
-const clans = ["TON Station", "HiddenCode", "h2o", "Tapper Legends"];
-const levels = [
-  "all_users",
-  "novice",
-  "explorer",
-  "apprentice",
-  "warrior",
-  "master",
-  "champion",
-  "tactician",
-  "specialist",
-  "conqueror",
-  "legend",
-];
 const participantTypes = ["All Users", "Clan(s)", "Level(s)", "Specific User(s)"];
 
 const CreateChallengeOverlay: React.FC<CreateChallengeOverlayProps> = ({
   onClose,
   challengeToEdit,
   onSubmit,
-  isEditing,
+  clans,
+  levels,
 }) => {
   const [formData, setFormData] = useState<ChallengeFormData>(
     challengeToEdit || {
@@ -68,7 +56,6 @@ const CreateChallengeOverlay: React.FC<CreateChallengeOverlayProps> = ({
     clans: false,
     levels: false,
   });
-  const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -81,69 +68,22 @@ const CreateChallengeOverlay: React.FC<CreateChallengeOverlayProps> = ({
 
   useEffect(() => {
     if (challengeToEdit) {
-      const durationParts = challengeToEdit.challengeDuration
-        ? `${challengeToEdit.challengeDuration.hours}:${challengeToEdit.challengeDuration.minutes}:${challengeToEdit.challengeDuration.seconds}`.split(":")
-        : ["0", "0", "0"];
       setFormData({
         id: challengeToEdit.id,
-        challengeName: challengeToEdit.challengeName || "",
-        challengeReward: challengeToEdit.challengeReward?.toString() || "",
-        challengeDescription: challengeToEdit.challengeDescription || "",
+        challengeName: challengeToEdit.challengeName,
+        challengeReward: challengeToEdit.challengeReward,
+        challengeDescription: challengeToEdit.challengeDescription,
         launchDate: challengeToEdit.launchDate ? new Date(challengeToEdit.launchDate) : new Date(),
-        challengeDuration: {
-          days: 0,
-          hours: parseInt(durationParts[0]) || 0,
-          minutes: parseInt(durationParts[1]) || 0,
-          seconds: parseInt(durationParts[2]) || 0,
-        },
-        participantType: getParticipantTypeReverse(challengeToEdit.participantType || "all_users"),
-        selectedClans: challengeToEdit.participantType === "clan" ? challengeToEdit.selectedClans || [] : [],
-        selectedLevels: challengeToEdit.participantType === "level" ? challengeToEdit.selectedLevels || [] : [],
-        specificUsers: challengeToEdit.participantType === "specific_users" ? challengeToEdit.specificUsers || "" : "",
+        challengeDuration: challengeToEdit.challengeDuration,
+        participantType: challengeToEdit.participantType,
+        selectedClans: challengeToEdit.selectedClans || [],
+        selectedLevels: challengeToEdit.selectedLevels || [],
+        specificUsers: challengeToEdit.specificUsers || "",
         image: null,
         imagePreview: challengeToEdit.imagePreview || "",
       });
     }
   }, [challengeToEdit]);
-
-  const formatDurationForDisplay = (duration: {
-    days: number;
-    hours: number;
-    minutes: number;
-    seconds: number;
-  }) => {
-    return `${String(duration.hours).padStart(2, "0")}:${String(duration.minutes).padStart(2, "0")}:${String(duration.seconds).padStart(2, "0")}`;
-  };
-
-  const getParticipantTypeReverse = (participants: string): string => {
-    switch (participants) {
-      case "all_users":
-        return "All Users";
-      case "clan":
-        return "Clan(s)";
-      case "level":
-        return "Level(s)";
-      case "specific_users":
-        return "Specific User(s)";
-      default:
-        return "All Users";
-    }
-  };
-
-  const getParticipantType = (type: string): string => {
-    switch (type) {
-      case "All Users":
-        return "all_users";
-      case "Clan(s)":
-        return "clan";
-      case "Level(s)":
-        return "level";
-      case "Specific User(s)":
-        return "specific_users";
-      default:
-        return "all_users";
-    }
-  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -172,11 +112,12 @@ const CreateChallengeOverlay: React.FC<CreateChallengeOverlayProps> = ({
   };
 
   const toggleDropdown = (field: keyof typeof showDropdown) => {
-    setShowDropdown((prev) => {
-      const newState = { beneficiaries: false, clans: false, levels: false };
-      newState[field] = !prev[field];
-      return newState;
-    });
+    setShowDropdown((prev) => ({
+      beneficiaries: false,
+      clans: false,
+      levels: false,
+      [field]: !prev[field],
+    }));
   };
 
   const handleCheckboxChange = (field: "selectedClans" | "selectedLevels", item: string) => {
@@ -205,6 +146,13 @@ const CreateChallengeOverlay: React.FC<CreateChallengeOverlayProps> = ({
   const formatDate = (date: Date | null): string => {
     if (!date) return "DD-MM-YYYY";
     return date.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
+  };
+
+  const formatDuration = (): string => {
+    const { days, hours, minutes, seconds } = formData.challengeDuration;
+    return `${days.toString().padStart(2, "0")}:${hours.toString().padStart(2, "0")}:${minutes
+      .toString()
+      .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
   };
 
   const getDaysInMonth = (date: Date) => {
@@ -241,7 +189,7 @@ const CreateChallengeOverlay: React.FC<CreateChallengeOverlayProps> = ({
     ];
 
     return (
-      <div className="w-64 bg-white rounded-md p-3 shadow-lg z-10">
+      <div className="w-48 bg-white rounded-md p-3 shadow-lg z-10">
         <div className="flex justify-between items-center mb-2 text-black">
           <button onClick={() => changeMonth(-1)} className="text-sm">
             {"<"}
@@ -265,7 +213,7 @@ const CreateChallengeOverlay: React.FC<CreateChallengeOverlayProps> = ({
               className={`text-center py-1 rounded cursor-pointer text-xs ${
                 date
                   ? formData.launchDate && date.toDateString() === formData.launchDate.toDateString()
-                    ? "bg-orange-500 text-white"
+                    ? "bg-orange-400 text-white"
                     : "hover:bg-gray-100"
                   : ""
               }`}
@@ -281,8 +229,17 @@ const CreateChallengeOverlay: React.FC<CreateChallengeOverlayProps> = ({
 
   const CustomTimePicker: React.FC = () => {
     return (
-      <div className="w-64 bg-white rounded-md p-4 shadow-lg z-10">
+      <div className="w-64 bg-white rounded-md p-4 shadow-lg z-10 text-black">
         <div className="flex items-center gap-2">
+          <input
+            type="number"
+            min="0"
+            value={formData.challengeDuration.days}
+            onChange={(e) => handleDurationChange("days", e.target.value)}
+            placeholder="DD"
+            className="w-16 h-10 bg-[#19191A] border border-[#363638] rounded-md px-2 text-white text-sm text-center"
+          />
+          <span>:</span>
           <input
             type="number"
             min="0"
@@ -291,9 +248,8 @@ const CreateChallengeOverlay: React.FC<CreateChallengeOverlayProps> = ({
             onChange={(e) => handleDurationChange("hours", e.target.value)}
             placeholder="HH"
             className="w-16 h-10 bg-[#19191A] border border-[#363638] rounded-md px-2 text-white text-sm text-center"
-            disabled={isSubmitting}
           />
-          <span className="text-black">:</span>
+          <span>:</span>
           <input
             type="number"
             min="0"
@@ -302,9 +258,8 @@ const CreateChallengeOverlay: React.FC<CreateChallengeOverlayProps> = ({
             onChange={(e) => handleDurationChange("minutes", e.target.value)}
             placeholder="MM"
             className="w-16 h-10 bg-[#19191A] border border-[#363638] rounded-md px-2 text-white text-sm text-center"
-            disabled={isSubmitting}
           />
-          <span className="text-black">:</span>
+          <span>:</span>
           <input
             type="number"
             min="0"
@@ -313,7 +268,6 @@ const CreateChallengeOverlay: React.FC<CreateChallengeOverlayProps> = ({
             onChange={(e) => handleDurationChange("seconds", e.target.value)}
             placeholder="SS"
             className="w-16 h-10 bg-[#19191A] border border-[#363638] rounded-md px-2 text-white text-sm text-center"
-            disabled={isSubmitting}
           />
         </div>
       </div>
@@ -334,9 +288,10 @@ const CreateChallengeOverlay: React.FC<CreateChallengeOverlayProps> = ({
       return false;
     }
     if (
-      !formData.challengeDuration.hours &&
-      !formData.challengeDuration.minutes &&
-      !formData.challengeDuration.seconds
+      formData.challengeDuration.days === 0 &&
+      formData.challengeDuration.hours === 0 &&
+      formData.challengeDuration.minutes === 0 &&
+      formData.challengeDuration.seconds === 0
     ) {
       setError("Please set a valid challenge duration.");
       return false;
@@ -357,7 +312,7 @@ const CreateChallengeOverlay: React.FC<CreateChallengeOverlayProps> = ({
       setError("Please enter at least one user.");
       return false;
     }
-    if (!isEditing && !formData.image && !formData.imagePreview) {
+    if (!formData.image && !formData.imagePreview && !challengeToEdit) {
       setError("Please upload an image for the challenge.");
       return false;
     }
@@ -366,20 +321,16 @@ const CreateChallengeOverlay: React.FC<CreateChallengeOverlayProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
     setError(null);
-  
+    setIsSubmitting(true);
+
     if (!validateFormData()) {
       setIsSubmitting(false);
       return;
     }
-  
+
     try {
-      await onSubmit({
-        ...formData,
-        participantType: getParticipantType(formData.participantType),
-      });
-      // Remove setShowSuccessOverlay(true) from here
+      await onSubmit(formData);
     } catch (err) {
       setError((err as Error).message);
       console.error("Challenge submission error:", err);
@@ -411,7 +362,6 @@ const CreateChallengeOverlay: React.FC<CreateChallengeOverlayProps> = ({
                       checked={formData.selectedClans.includes(clan)}
                       onChange={() => handleCheckboxChange("selectedClans", clan)}
                       className="w-4 h-4"
-                      disabled={isSubmitting}
                     />
                     {clan}
                   </label>
@@ -439,7 +389,6 @@ const CreateChallengeOverlay: React.FC<CreateChallengeOverlayProps> = ({
                       checked={formData.selectedLevels.includes(level)}
                       onChange={() => handleCheckboxChange("selectedLevels", level)}
                       className="w-4 h-4"
-                      disabled={isSubmitting}
                     />
                     {level}
                   </label>
@@ -453,11 +402,10 @@ const CreateChallengeOverlay: React.FC<CreateChallengeOverlayProps> = ({
           <input
             type="text"
             name="specificUsers"
-            placeholder="Enter users name (comma-separated)"
+            placeholder="Enter users (comma-separated)"
             value={formData.specificUsers}
             onChange={handleInputChange}
             className="w-full h-12 bg-[#19191A] border border-[#363638] rounded-md px-3 text-white text-xs"
-            disabled={isSubmitting}
           />
         );
       default:
@@ -466,18 +414,25 @@ const CreateChallengeOverlay: React.FC<CreateChallengeOverlayProps> = ({
   };
 
   return (
-  <div className="fixed inset-0 bg-black/70 flex justify-center items-center z-50">
-    <div className="w-full max-w-3xl bg-[#202022] rounded-lg p-6 text-orange-500 max-h-[90vh] overflow-y-auto">
-      <div className="relative text-center py-5">
-        <h2 className="text-xl font-bold">{isEditing ? "Update Challenge" : "Create New Challenge"}</h2>
-        <button className="absolute right-0 top-1/2 -translate-y-1/2" onClick={onClose} disabled={isSubmitting}>
-          <Image src="/cancel.png" alt="Close" width={24} height={24} />
-        </button>
-      </div>
+    <div className="fixed inset-0 bg-black/70 flex justify-center items-center z-50" onClick={onClose}>
+      <div
+        className="w-full max-w-xl bg-[#202022] rounded-lg p-6 text-orange-400 max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="relative text-center py-5">
+          <h2 className="text-xl font-bold">{challengeToEdit ? "Update Challenge" : "Create New Challenge"}</h2>
+          <button className="absolute right-0 top-1/2 -translate-y-1/2" onClick={onClose}>
+            <Image src="/cancel.png" alt="Close" width={24} height={24} />
+          </button>
+        </div>
 
-      {error && <div className="text-red-500 text-xs text-center mb-4">Error: {error}</div>}
+        {error && (
+          <div className="text-red-500 text-xs text-center mb-4">
+            Error: {error}
+          </div>
+        )}
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label className="block text-xs mb-1.5">Challenge Name</label>
             <input
@@ -486,9 +441,8 @@ const CreateChallengeOverlay: React.FC<CreateChallengeOverlayProps> = ({
               placeholder="Enter challenge name"
               value={formData.challengeName}
               onChange={handleInputChange}
-              className="w-full h-12 bg-[#19191A] border border-[#363638] rounded-md px-3 text-white text-xs"
+              className="w-full h-10 bg-[#19191A] border border-[#363638] rounded-md px-3 text-white text-xs"
               required
-              disabled={isSubmitting}
             />
           </div>
 
@@ -504,7 +458,6 @@ const CreateChallengeOverlay: React.FC<CreateChallengeOverlayProps> = ({
                   onChange={handleInputChange}
                   className="w-full h-12 bg-[#19191A] border border-[#363638] rounded-md px-3 pr-10 text-white text-xs"
                   required
-                  disabled={isSubmitting}
                 />
                 <Image
                   src="/logo.png"
@@ -524,7 +477,6 @@ const CreateChallengeOverlay: React.FC<CreateChallengeOverlayProps> = ({
                 value={formData.challengeDescription}
                 onChange={handleInputChange}
                 className="w-full h-12 bg-[#19191A] border border-[#363638] rounded-md px-3 text-white text-xs"
-                disabled={isSubmitting}
               />
             </div>
           </div>
@@ -539,7 +491,6 @@ const CreateChallengeOverlay: React.FC<CreateChallengeOverlayProps> = ({
                   value={formatDate(formData.launchDate)}
                   readOnly
                   className="w-full h-12 bg-[#19191A] border border-[#363638] rounded-md px-3 pr-10 text-white text-xs"
-                  disabled={isSubmitting}
                 />
                 <Image
                   src="/date.png"
@@ -547,7 +498,7 @@ const CreateChallengeOverlay: React.FC<CreateChallengeOverlayProps> = ({
                   width={20}
                   height={20}
                   className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer"
-                  onClick={() => !isSubmitting && setShowDatePicker(!showDatePicker)}
+                  onClick={() => setShowDatePicker(!showDatePicker)}
                 />
                 {showDatePicker && (
                   <div className="absolute top-full left-0 mt-2 z-10">
@@ -561,10 +512,9 @@ const CreateChallengeOverlay: React.FC<CreateChallengeOverlayProps> = ({
               <div className="relative">
                 <input
                   type="text"
-                  value={formatDurationForDisplay(formData.challengeDuration)}
+                  value={formatDuration()}
                   readOnly
                   className="w-full h-12 bg-[#19191A] border border-[#363638] rounded-md px-3 pr-10 text-white text-xs"
-                  disabled={isSubmitting}
                 />
                 <Image
                   src="/time.png"
@@ -572,7 +522,7 @@ const CreateChallengeOverlay: React.FC<CreateChallengeOverlayProps> = ({
                   width={20}
                   height={20}
                   className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer"
-                  onClick={() => !isSubmitting && setShowTimePicker(!showTimePicker)}
+                  onClick={() => setShowTimePicker(!showTimePicker)}
                 />
                 {showTimePicker && (
                   <div className="absolute top-full left-0 mt-2 z-10">
@@ -592,7 +542,6 @@ const CreateChallengeOverlay: React.FC<CreateChallengeOverlayProps> = ({
                 onChange={(e) => handleParticipantSelection(e.target.value)}
                 className="w-full h-12 bg-[#19191A] border border-[#363638] rounded-md px-3 text-white text-xs"
                 required
-                disabled={isSubmitting}
               >
                 <option value="">Select participant type</option>
                 {participantTypes.map((type) => (
@@ -613,58 +562,37 @@ const CreateChallengeOverlay: React.FC<CreateChallengeOverlayProps> = ({
           <div>
             <label className="block text-xs mb-1.5">Upload Challenge Image</label>
             <div className="h-32 bg-[#19191A] border border-dashed border-[#363638] rounded-md flex flex-col items-center justify-center p-6">
-              <Image src="/upload.png" alt="Upload" width={24} height={24} className="mb-2" />
-              <p className="text-xs text-gray-400">
-                Drop your image here or{" "}
-                <label className="text-orange-500 cursor-pointer">
-                  <input
-                    type="file"
-                    accept=".jpg,.jpeg,.png"
-                    onChange={handleImageUpload}
-                    className="hidden"
-                    disabled={isSubmitting}
-                  />
-                  Browse
-                </label>
-              </p>
-              <p className="text-xs text-gray-400">Support: jpg, jpeg, png</p>
-              {formData.imagePreview && (
-                <div className="mt-2">
-                  <Image src={formData.imagePreview} alt="Preview" width={50} height={50} />
-                </div>
+              {formData.imagePreview ? (
+                <Image src={formData.imagePreview} alt="Preview" width={50} height={50} />
+              ) : (
+                <>
+                  <Image src="/upload.png" alt="Upload" width={24} height={24} className="mb-2" />
+                  <p className="text-xs text-gray-400">
+                    Drop your image here or{" "}
+                    <label className="text-orange-400 cursor-pointer">
+                      <input
+                        type="file"
+                        accept=".jpg,.jpeg,.png"
+                        onChange={handleImageUpload}
+                        className="hidden"
+                      />
+                      Browse
+                    </label>
+                  </p>
+                  <p className="text-xs text-gray-400">Support: jpg, jpeg, png</p>
+                </>
               )}
             </div>
           </div>
 
           <button
-          type="submit"
-          className="w-80 h-14 bg-white text-black rounded-md font-bold text-sm hover:bg-orange-500 mx-auto block"
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? "Submitting..." : "Submit"}
-        </button>
-      </form>
-
-        {showSuccessOverlay && (
-          <div className="fixed inset-0 bg-black/70 flex justify-center items-center z-50">
-            <div className="bg-[#202022] rounded-lg p-6 text-white w-80 text-center">
-              <Image src="/success.png" alt="Success" width={100} height={100} className="mx-auto mb-4" />
-              <h2 className="text-xl font-bold mb-4">Success!</h2>
-              <p className="text-xs mb-6">
-                Challenge {isEditing ? "updated" : "created"} successfully.
-              </p>
-              <button
-                className="w-full h-12 bg-black text-white rounded-md hover:bg-green-600"
-                onClick={() => {
-                  setShowSuccessOverlay(false);
-                  onClose();
-                }}
-              >
-                Proceed
-              </button>
-            </div>
-          </div>
-        )}
+            type="submit"
+            className="w-80 h-14 bg-white text-black rounded-md font-bold text-sm hover:bg-orange-400 mx-auto block disabled:opacity-50"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? "Submitting..." : "Submit"}
+          </button>
+        </form>
       </div>
     </div>
   );

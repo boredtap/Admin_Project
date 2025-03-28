@@ -6,9 +6,9 @@ import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import NavigationPanel from "@/components/NavigationPanel";
 import AppBar from "@/components/AppBar";
-import UserProfileOverlay, { User } from "@/components/UserProfileOverlay"; // Import User type
+import UserProfileOverlay, { User } from "@/components/UserProfileOverlay";
 import * as XLSX from "xlsx";
-import { API_BASE_URL } from "@/config/api"; // Import API base URL
+import { API_BASE_URL } from "@/config/api";
 
 interface LeaderboardApiResponse {
   username: string;
@@ -28,8 +28,7 @@ interface Filters {
 
 const Leaderboard: React.FC = () => {
   const [showOverlay, setShowOverlay] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [selectedRows, setSelectedRows] = useState<number[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"All Time" | "Daily" | "Weekly" | "Monthly">("All Time");
   const [showActionDropdown, setShowActionDropdown] = useState<number | null>(null);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
@@ -80,23 +79,18 @@ const Leaderboard: React.FC = () => {
       });
 
       if (!response.ok) throw new Error(`Failed to fetch leaderboard: ${response.status}`);
-      const data: LeaderboardApiResponse[] = await response.json(); // Type the response
-      const mappedData: User[] = data.map((item: LeaderboardApiResponse) => ({
-
+      const data: LeaderboardApiResponse[] = await response.json();
+      const mappedData: User[] = data.map((item) => ({
         username: item.username,
         level_name: item.level_name,
         coins_earned: item.coins_earned,
         longest_streak: item.longest_streak,
         rank: item.rank,
-        telegram_user_id: item.telegram_user_id || "", // Ensure this comes from API
+        telegram_user_id: item.telegram_user_id || "",
         level: item.level ? parseInt(item.level) : 0,
-        image_url: item.image_url || "", // Include if available
-        overall_achievement: undefined,
-        today_achievement: undefined,
-        wallet_address: undefined,
+        image_url: item.image_url || "",
         clan: item.clan ? { clan_name: item.clan, in_clan_rank: 0 } : undefined,
       }));
-      console.log("Mapped leaderboard data:", mappedData);
       setLeaderboardData((prev) => ({ ...prev, [category]: mappedData }));
     } catch (err) {
       console.error("Error fetching leaderboard:", err);
@@ -127,9 +121,8 @@ const Leaderboard: React.FC = () => {
     });
   };
 
-  const handleRowClick = (index: number) => {
-    setSelectedRows((prev) => (prev.includes(index) ? [] : [index]));
-    setSelectedUser(filteredData[index]);
+  const handleRowClick = (telegramUserId: string) => {
+    setSelectedUserId(telegramUserId);
     setShowOverlay(true);
   };
 
@@ -137,10 +130,11 @@ const Leaderboard: React.FC = () => {
     setShowActionDropdown(showActionDropdown === index ? null : index);
   };
 
-  const handleDelete = () => {
-    const updatedData = leaderboardData[activeTab].filter((_, index) => !selectedRows.includes(index));
+  const handleDelete = (telegramUserId: string) => {
+    const updatedData = leaderboardData[activeTab].filter(
+      (user) => user.telegram_user_id !== telegramUserId
+    );
     setLeaderboardData((prev) => ({ ...prev, [activeTab]: updatedData }));
-    setSelectedRows([]);
   };
 
   const handleExport = () => {
@@ -176,7 +170,6 @@ const Leaderboard: React.FC = () => {
         <div className="flex-1 pt-28 pl-44 pr-2 bg-[#141414] lg:pl-52 sm:pt-24 sm:pl-0">
           <div className="flex-1 py-4 min-w-0 max-w-[calc(100%)]">
             <div className="bg-[#202022] rounded-lg p-4 border border-white/20">
-              {/* Tabs and Buttons */}
               <div className="flex justify-between items-center mb-4">
                 <div className="flex gap-4">
                   {["All Time", "Daily", "Weekly", "Monthly"].map((tab) => (
@@ -201,17 +194,11 @@ const Leaderboard: React.FC = () => {
                     <Image src="/download.png" alt="Export" width={12} height={12} />
                     Export
                   </button>
-                  <button className="flex items-center gap-2 bg-white text-[#202022] text-xs px-3 py-2 rounded-lg">
-                    <Image src="/stop.png" alt="Suspend" width={12} height={12} />
-                    Suspend
-                  </button>
                 </div>
               </div>
 
-              {/* Divider */}
               <div className="border-t border-white/20 mb-4"></div>
 
-              {/* Search, Date, Delete */}
               <div className="flex justify-between items-center mb-4">
                 <div className="flex items-center bg-[#19191A] rounded-lg w-full max-w-[500px] h-[54px] p-4 relative sm:h-10">
                   <Image src="/search.png" alt="Search" width={16} height={16} />
@@ -252,25 +239,10 @@ const Leaderboard: React.FC = () => {
                     </div>
                   )}
                 </div>
-                <div className="flex items-center gap-2">
-                  <button className="flex items-center gap-2 bg-[#19191A] text-white text-xs px-3 py-2 rounded-lg cursor-pointer">
-                    <Image src="/Date.png" alt="Date" width={12} height={12} />
-                    <span>DD-MM-YYYY</span>
-                  </button>
-                  <button
-                    className="flex items-center gap-2 bg-red-600 text-white text-xs px-3 py-2 rounded-lg"
-                    onClick={handleDelete}
-                  >
-                    <Image src="/delete.png" alt="Delete" width={12} height={12} />
-                    Delete
-                  </button>
-                </div>
               </div>
 
-              {/* Divider */}
               <div className="border-t border-white/20 mb-4"></div>
 
-              {/* Table Headers */}
               <div className="grid grid-cols-[40px_1fr_1fr_1fr_1fr_1fr_1fr_1fr] gap-3 text-[#AEAAAA] text-xs font-medium mb-2">
                 <div />
                 <div>Rank</div>
@@ -282,24 +254,22 @@ const Leaderboard: React.FC = () => {
                 <div>Action</div>
               </div>
 
-              {/* Divider */}
               <div className="border-t border-white/20 mb-4"></div>
 
-              {/* Table Content */}
               {filteredData
                 .slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage)
                 .map((user, index) => (
                   <div
-                    key={index}
+                    key={user.telegram_user_id || index}
                     className={`grid grid-cols-[40px_1fr_1fr_1fr_1fr_1fr_1fr_1fr] gap-3 py-3 text-xs ${
-                      selectedRows.includes(index) ? "bg-white text-black rounded-lg" : "text-white"
+                      selectedUserId === user.telegram_user_id ? "bg-white text-black rounded-lg" : "text-white"
                     }`}
-                    onClick={() => handleRowClick(index)}
+                    onClick={() => handleRowClick(user.telegram_user_id || "")}
                   >
                     <div className="flex items-center justify-center">
                       <div
                         className={`w-4 h-4 border-2 rounded-full cursor-pointer ${
-                          selectedRows.includes(index) ? "bg-black border-black" : "border-white"
+                          selectedUserId === user.telegram_user_id ? "bg-black border-black" : "border-white"
                         }`}
                       />
                     </div>
@@ -315,20 +285,19 @@ const Leaderboard: React.FC = () => {
                     <div className="relative">
                       <div
                         className="flex items-center gap-2 cursor-pointer"
-                        onClick={() => handleActionClick(index)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleActionClick(index);
+                        }}
                       >
                         <span className="text-xs">Action</span>
                         <Image src="/dropdown.png" alt="Dropdown" width={16} height={16} />
                       </div>
                       {showActionDropdown === index && (
                         <div className="absolute right-0 mt-2 w-32 bg-white rounded-lg shadow-lg z-10 text-black p-2">
-                          <div className="flex items-center gap-2 px-2 py-2 hover:bg-gray-100 cursor-pointer text-xs">
-                            <Image src="/edit.png" alt="Edit" width={12} height={12} />
-                            Edit
-                          </div>
                           <div
                             className="flex items-center gap-2 px-2 py-2 hover:bg-gray-100 cursor-pointer text-xs"
-                            onClick={handleDelete}
+                            onClick={() => handleDelete(user.telegram_user_id || "")}
                           >
                             <Image src="/deletered.png" alt="Delete" width={12} height={12} />
                             Delete
@@ -339,7 +308,6 @@ const Leaderboard: React.FC = () => {
                   </div>
                 ))}
 
-              {/* Divider with Pagination */}
               <div className="relative mt-6">
                 <div className="border-t border-white/20"></div>
                 <div className="flex flex-col sm:flex-row justify-between items-center mt-4 text-white">
@@ -397,9 +365,11 @@ const Leaderboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Overlay */}
-        {showOverlay && selectedUser && (
-          <UserProfileOverlay user={selectedUser} onClose={() => setShowOverlay(false)} />
+        {showOverlay && (
+          <UserProfileOverlay
+            user={filteredData.find((u) => u.telegram_user_id === selectedUserId) || filteredData[0]}
+            onClose={() => setShowOverlay(false)}
+          />
         )}
       </div>
     </div>

@@ -1,18 +1,17 @@
-// src/components/UserProfileOverlay.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import { API_BASE_URL } from "@/config/api";
-import CreateNewReward, { RewardFormData } from "./CreateNewReward"; // Import RewardFormData
+import CreateNewReward, { RewardFormData } from "./CreateNewReward";
 
 export interface Achievement {
-  total_coin: number; // Matches backend field name
+  total_coin: number;
   completed_tasks: number;
-  longest_streak?: number; // Optional in leaderboard response
-  current_streak?: number; // Optional in leaderboard response
-  rank: string; // String to match "#1" or "0"
-  invitees?: number | null; // Can be null in today_achievement
+  longest_streak?: number;
+  current_streak?: number;
+  rank: string;
+  invitees?: number | null;
 }
 
 export interface Clan {
@@ -21,18 +20,18 @@ export interface Clan {
 }
 
 export interface User {
-  telegram_user_id?: string; // Not in response, but passed from parent
+  telegram_user_id?: string;
   username: string;
-  level?: number; // Number in leaderboard response
+  level?: number;
   level_name: string;
   image_url?: string;
   overall_achievement?: Achievement;
   today_achievement?: Achievement;
   wallet_address?: string | null;
   clan?: Clan | null;
-  coins_earned?: number; // Fallback from parent component
-  longest_streak?: number; // Fallback from parent component
-  rank?: number; // Fallback from parent component
+  coins_earned?: number;
+  longest_streak?: number;
+  rank?: number;
 }
 
 interface UserProfileOverlayProps {
@@ -41,9 +40,9 @@ interface UserProfileOverlayProps {
 }
 
 const UserProfileOverlay: React.FC<UserProfileOverlayProps> = ({ onClose, user }) => {
-    const [profile, setProfile] = useState<User | null>(null);
-    const [error, setError] = useState<string | null>(null);
-    const [showRewardOverlay, setShowRewardOverlay] = useState(false); // State for reward overlay
+  const [profile, setProfile] = useState<User | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [showRewardOverlay, setShowRewardOverlay] = useState(false);
 
   useEffect(() => {
     if (user?.telegram_user_id) {
@@ -65,7 +64,12 @@ const UserProfileOverlay: React.FC<UserProfileOverlayProps> = ({ onClose, user }
           if (!response.ok) throw new Error(`Failed to fetch user profile: ${response.status}`);
           const data: User = await response.json();
           console.log("Fetched profile data:", data);
-          setProfile(data);
+          setProfile({
+            ...data,
+            coins_earned: user.coins_earned ?? data.coins_earned,
+            longest_streak: user.longest_streak ?? data.longest_streak,
+            rank: user.rank ?? data.rank,
+          });
         } catch (err) {
           setError((err as Error).message);
           console.error("Error fetching profile:", err);
@@ -74,18 +78,16 @@ const UserProfileOverlay: React.FC<UserProfileOverlayProps> = ({ onClose, user }
       fetchProfile();
     } else {
       console.log("No telegram_user_id provided, using initial user data:", user);
-      setProfile(user); // Fallback to initial user data
+      setProfile(user);
     }
   }, [user]);
 
   const displayData = profile || user || {};
 
   const handleRewardSubmit = async (rewardData: RewardFormData) => {
-    // Logic to handle reward submission (could call an API or update state)
     console.log("Reward submitted:", rewardData);
-    setShowRewardOverlay(false); // Close overlay on success
+    setShowRewardOverlay(false);
   };
-
 
   if (error) {
     return (
@@ -106,6 +108,9 @@ const UserProfileOverlay: React.FC<UserProfileOverlayProps> = ({ onClose, user }
       </div>
     );
   }
+
+  const overallCoins = displayData.overall_achievement?.total_coin ?? displayData.coins_earned ?? "-";
+  const todayCoins = displayData.today_achievement?.total_coin ?? (displayData.coins_earned ? 0 : "-");
 
   return (
     <div className="fixed inset-0 bg-black/70 flex justify-center items-center z-50" onClick={onClose}>
@@ -145,7 +150,7 @@ const UserProfileOverlay: React.FC<UserProfileOverlayProps> = ({ onClose, user }
           <div className="flex justify-between text-sm">
             <div className="flex flex-col">
               <span className="text-xs text-[#AEAAAA]">Total Coins</span>
-              <p>{displayData.overall_achievement?.total_coin ?? displayData.coins_earned ?? "-"}</p>
+              <p>{overallCoins}</p>
             </div>
             <div className="flex flex-col">
               <span className="text-xs text-[#AEAAAA]">Completed Tasks</span>
@@ -173,7 +178,7 @@ const UserProfileOverlay: React.FC<UserProfileOverlayProps> = ({ onClose, user }
           <div className="flex justify-between text-sm">
             <div className="flex flex-col">
               <span className="text-xs text-[#AEAAAA]">Total Coins</span>
-              <p>{displayData.today_achievement?.total_coin ?? "-"}</p>
+              <p>{todayCoins}</p>
             </div>
             <div className="flex flex-col">
               <span className="text-xs text-[#AEAAAA]">Completed Tasks</span>
@@ -234,23 +239,22 @@ const UserProfileOverlay: React.FC<UserProfileOverlayProps> = ({ onClose, user }
         <div className="flex justify-center gap-4 mt-6">
           <button
             className="flex items-center gap-2 bg-[#0CAF60] text-white py-2 px-4 rounded-lg hover:bg-green-700 text-xs"
-            onClick={() => setShowRewardOverlay(true)} // Open reward overlay
+            onClick={() => setShowRewardOverlay(true)}
           >
             <Image src="/add2.png" alt="Reward" width={20} height={20} />
             Reward
           </button>
         </div>
-      </div>
 
-      {/* Reward Overlay */}
-      {showRewardOverlay && (
-        <CreateNewReward
-          onClose={() => setShowRewardOverlay(false)}
-          rewardToEdit={null} // No editing, creating new reward
-          onSubmit={handleRewardSubmit}
-          prefilledUser={displayData} // Pass user data for pre-filling
-        />
-      )}
+        {showRewardOverlay && (
+          <CreateNewReward
+            onClose={() => setShowRewardOverlay(false)}
+            rewardToEdit={null}
+            onSubmit={handleRewardSubmit}
+            prefilledUser={displayData}
+          />
+        )}
+      </div>
     </div>
   );
 };

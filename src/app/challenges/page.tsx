@@ -1,4 +1,3 @@
-// src/app/challenges/page.tsx
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
@@ -41,30 +40,26 @@ interface Filters {
   reward: { [key: string]: boolean };
 }
 
-const Challenges = () => {
+const Challenges: React.FC = () => {
   const router = useRouter();
-  const [showSuccessOverlay, setShowSuccessOverlay] = useState(false); // Add this state
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<"Opened Challenges" | "Completed Challenges">("Opened Challenges");
   const [showActionDropdown, setShowActionDropdown] = useState<number | null>(null);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [rowsPerPage, setRowsPerPage] = useState(5);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [showCreateChallengeOverlay, setShowCreateChallengeOverlay] = useState(false);
   const [showDeleteOverlay, setShowDeleteOverlay] = useState(false);
-  const [selectedChallenge, setSelectedChallenge] = useState<ChallengeFormData | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [showCreateChallengeOverlay, setShowCreateChallengeOverlay] = useState(false);
+  const [challengeToEdit, setChallengeToEdit] = useState<ChallengeFormData | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-
+  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [clans, setClans] = useState<string[]>([]);
+  const [levels, setLevels] = useState<string[]>([]);
   const [filters, setFilters] = useState<Filters>({
     participants: { "All Users": false, "Selected Users": false, "VIP Users": false },
     reward: { "1000-5000": false, "5001-10000": false, "10001+": false },
   });
-
   const [challengesData, setChallengesData] = useState<{
     "Opened Challenges": Challenge[];
     "Completed Challenges": Challenge[];
@@ -73,12 +68,43 @@ const Challenges = () => {
     "Completed Challenges": [],
   });
 
+  const isTokenExpired = (token: string): boolean => {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return payload.exp * 1000 < Date.now();
+  };
+
+  const refreshToken = useCallback(async (): Promise<string | null> => {
+    try {
+      const refresh = localStorage.getItem("refresh_token");
+      const response = await fetch(`${API_BASE_URL}/refresh`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          grant_type: "refresh_token",
+          refresh_token: refresh || "",
+          client_id: "string",
+          client_secret: "string",
+        }),
+      });
+      if (!response.ok) throw new Error("Failed to refresh token");
+      const data = await response.json();
+      localStorage.setItem("access_token", data.access_token);
+      return data.access_token;
+    } catch {
+      router.push("/signin");
+      return null;
+    }
+  }, [router]);
+
   const fetchChallenges = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const token = localStorage.getItem("access_token");
-      if (!token) throw new Error("No access token found");
+      let token = localStorage.getItem("access_token");
+      if (!token || isTokenExpired(token)) {
+        token = await refreshToken();
+        if (!token) return;
+      }
 
       const [ongoingResponse, completedResponse] = await Promise.all([
         fetch(`${API_BASE_URL}/admin/challenge/get_challenges?status=ongoing`, {
@@ -105,102 +131,72 @@ const Challenges = () => {
     } finally {
       setLoading(false);
     }
-  }, [router]);
+  }, [router, refreshToken]);
+
+  const fetchClansAndLevels = useCallback(async () => {
+    const token = localStorage.getItem("access_token");
+    if (!token) return;
+
+    try {
+      const [clanResponse, levelResponse] = await Promise.all([
+        fetch(`${API_BASE_URL}/admin/clan/get_clans?category=all_clans&page=1&page_size=20`, {
+          headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+        }),
+        fetch(`${API_BASE_URL}/admin/levels/get_levels`, {
+          headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+        }),
+      ]);
+
+      if (clanResponse.ok) {
+        const clanData = await clanResponse.json();
+        setClans(clanData.map((clan: { name: string }) => clan.name));
+      }
+
+      if (levelResponse.ok) {
+        const levelData = await levelResponse.json();
+        setLevels(levelData.map((level: { name: string }) => level.name.toLowerCase()));
+      }
+    } catch (err) {
+      console.error("Error fetching clans or levels:", err);
+    }
+  }, []);
 
   useEffect(() => {
+    fetchClansAndLevels();
     fetchChallenges();
-  }, [fetchChallenges]);
+  }, [fetchChallenges, fetchClansAndLevels]);
 
-  const fetchChallengeById = async (challengeId: string): Promise<Challenge | null> => {
-    try {
-      const token = localStorage.getItem("access_token");
-      if (!token) return null;
-
-      const response = await fetch(`${API_BASE_URL}/admin/challenge/get_challenge_by_id/${challengeId}`, {
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      });
-
-      if (!response.ok) throw new Error("Failed to fetch challenge details");
-
-      return await response.json();
-    } catch (error) {
-      console.error("Error fetching challenge by ID:", error);
-      return null;
-    }
-  };
-
-  const handleEditChallenge = async (challenge: Challenge) => {
-    const fullChallenge = await fetchChallengeById(challenge.id);
-    if (fullChallenge) {
-      setSelectedChallenge({
-        id: fullChallenge.id,
-        challengeName: fullChallenge.name,
-        challengeReward: fullChallenge.reward.toString(),
-        challengeDescription: fullChallenge.description,
-        launchDate: new Date(fullChallenge.launch_date),
-        challengeDuration: { days: 0, hours: 0, minutes: 0, seconds: 0 },
-        participantType: fullChallenge.participants[0] || "all_users",
-        selectedClans: [],
-        selectedLevels: [],
-        specificUsers: "",
-        image: null,
-        imagePreview: "",
-      });
-      setShowCreateChallengeOverlay(true);
-    }
+  const handleEditChallenge = (challenge: Challenge) => {
+    setChallengeToEdit({
+      id: challenge.id,
+      challengeName: challenge.name,
+      challengeReward: challenge.reward.toString(),
+      challengeDescription: challenge.description,
+      launchDate: new Date(challenge.launch_date),
+      challengeDuration: parseDuration(challenge.remaining_time),
+      participantType: challenge.participants.length > 0 ? getParticipantTypeDisplay(challenge.participants[0]) : "All Users",
+      selectedClans: challenge.participants[0] === "clan" ? challenge.participants : [],
+      selectedLevels: challenge.participants[0] === "level" ? challenge.participants : [],
+      specificUsers: challenge.participants[0] === "specific_users" ? challenge.participants.join(", ") : "",
+      image: null,
+      imagePreview: "",
+    });
+    setShowCreateChallengeOverlay(true);
     setShowActionDropdown(null);
   };
 
-  const handleCreateChallengeSubmit = async (newChallenge: ChallengeFormData) => {
-    try {
-      const token = localStorage.getItem("access_token");
-      if (!token) throw new Error("No access token found");
+  const parseDuration = (duration: string) => {
+    const [days, hours, minutes, seconds] = duration.split(":").map(Number);
+    return { days: days || 0, hours: hours || 0, minutes: minutes || 0, seconds: seconds || 0 };
+  };
 
-      const queryParams = new URLSearchParams({
-        name: newChallenge.challengeName,
-        description: newChallenge.challengeDescription,
-        launch_date: newChallenge.launchDate ? newChallenge.launchDate.toISOString().split("T")[0] : "",
-        reward: newChallenge.challengeReward,
-        duration: `${newChallenge.challengeDuration.days.toString().padStart(2, "0")}:${newChallenge.challengeDuration.hours
-          .toString()
-          .padStart(2, "0")}:${newChallenge.challengeDuration.minutes.toString().padStart(2, "0")}:${newChallenge.challengeDuration.seconds
-          .toString()
-          .padStart(2, "0")}`,
-        participants: newChallenge.participantType,
-      }).toString();
-
-      const formData = new FormData();
-      if (newChallenge.selectedClans.length > 0) {
-        newChallenge.selectedClans.forEach((clan) => formData.append("clan", clan));
-      }
-      if (newChallenge.selectedLevels.length > 0) {
-        newChallenge.selectedLevels.forEach((level) => formData.append("level", level));
-      }
-      if (newChallenge.specificUsers) {
-        newChallenge.specificUsers.split(",").forEach((user) => formData.append("specific_users", user.trim()));
-      }
-      if (newChallenge.image) {
-        formData.append("image", newChallenge.image);
-      }
-
-      const url = `${API_BASE_URL}/admin/challenge/${newChallenge.id ? "update_challenge" : "create_challenge"}?${queryParams}`;
-      const response = await fetch(url, {
-        method: newChallenge.id ? "PUT" : "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(`Failed to submit challenge (Status: ${response.status}, Message: ${JSON.stringify(errorData)})`);
-      }
-
-      await fetchChallenges();
-      setShowSuccessOverlay(true); // Show success overlay
-      // Do NOT close the overlay here; let the user close it manually
-    } catch (error) {
-      console.error("Challenge submission error:", error);
-      setError((error as Error).message);
+  const getParticipantTypeDisplay = (type: string) => {
+    switch (type) {
+      case "all_users": return "All Users";
+      case "clan": return "Clan(s)";
+      case "level": return "Level(s)";
+      case "specific_users": return "Specific User(s)";
+      default: return "All Users";
     }
   };
 
@@ -234,6 +230,7 @@ const Challenges = () => {
       await fetchChallenges();
       setSelectedRows([]);
       setShowDeleteOverlay(false);
+      setShowActionDropdown(null);
     } catch (error) {
       console.error("Error deleting challenges:", error);
     }
@@ -256,83 +253,6 @@ const Challenges = () => {
 
   const formatDate = (date: Date): string => {
     return date.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
-  };
-
-  const getDaysInMonth = (date: Date) => {
-    const year = date.getFullYear();
-    const month = date.getMonth();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const firstDayOfMonth = new Date(year, month, 1).getDay();
-    const days: (Date | null)[] = [];
-    for (let i = 0; i < firstDayOfMonth; i++) days.push(null);
-    for (let i = 1; i <= daysInMonth; i++) days.push(new Date(year, month, i));
-    return days;
-  };
-
-  const handleDateSelect = (date: Date) => {
-    setSelectedDate(date);
-    setShowDatePicker(false);
-  };
-
-  const changeMonth = (offset: number) => {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + offset, 1));
-  };
-
-  const CustomDatePicker: React.FC = () => {
-    const days = getDaysInMonth(currentMonth);
-    const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    const months = [
-      "January",
-      "February",
-      "March",
-      "April",
-      "May",
-      "June",
-      "July",
-      "August",
-      "September",
-      "October",
-      "November",
-      "December",
-    ];
-
-    return (
-      <div className="w-64 bg-white rounded-lg p-3 shadow-lg z-10 text-black">
-        <div className="flex justify-between items-center mb-2">
-          <button onClick={() => changeMonth(-1)} className="text-sm">
-            {"<"}
-          </button>
-          <span className="text-xs">{`${months[currentMonth.getMonth()]} ${currentMonth.getFullYear()}`}</span>
-          <button onClick={() => changeMonth(1)} className="text-sm">
-            {">"}
-          </button>
-        </div>
-        <div className="grid grid-cols-7 gap-1 text-xs text-gray-600">
-          {weekDays.map((day) => (
-            <div key={day} className="text-center">
-              {day}
-            </div>
-          ))}
-        </div>
-        <div className="grid grid-cols-7 gap-1 mt-2">
-          {days.map((date, index) => (
-            <div
-              key={index}
-              className={`text-center py-1 rounded cursor-pointer text-xs ${
-                date
-                  ? selectedDate && date.toDateString() === selectedDate.toDateString()
-                    ? "bg-orange-500 text-white"
-                    : "hover:bg-gray-100"
-                  : ""
-              }`}
-              onClick={() => date && handleDateSelect(date)}
-            >
-              {date ? date.getDate() : ""}
-            </div>
-          ))}
-        </div>
-      </div>
-    );
   };
 
   const filteredData = challengesData[activeTab].filter((challenge) => {
@@ -373,7 +293,6 @@ const Challenges = () => {
             {error && <div className="text-red-500 text-center text-xs">Error: {error}</div>}
             {!loading && !error && (
               <div className="bg-[#202022] rounded-lg p-4 border border-white/20">
-                {/* Tabs and Buttons */}
                 <div className="flex justify-between items-center mb-4">
                   <div className="flex gap-4">
                     {["Opened Challenges", "Completed Challenges"].map((tab) => (
@@ -399,7 +318,7 @@ const Challenges = () => {
                     <button
                       className="flex items-center gap-2 bg-white text-[#202022] text-xs px-3 py-2 rounded-lg"
                       onClick={() => {
-                        setSelectedChallenge(null);
+                        setChallengeToEdit(null);
                         setShowCreateChallengeOverlay(true);
                       }}
                     >
@@ -409,10 +328,8 @@ const Challenges = () => {
                   </div>
                 </div>
 
-                {/* Divider Under Tabs */}
-                <div className="border-t border-white/20 mb-4"></div>
+                <div className="border-t border-white/20 mb-4" />
 
-                {/* Search, Date, Delete */}
                 <div className="flex justify-between items-center mb-4">
                   <div className="flex items-center bg-[#19191A] rounded-lg w-full max-w-[500px] h-[54px] p-4 relative sm:h-10">
                     <Image src="/search.png" alt="Search" width={16} height={16} />
@@ -474,20 +391,9 @@ const Challenges = () => {
                   </div>
                   <div className="flex items-center gap-2">
                     <button
-                      className="flex items-center gap-2 bg-[#19191A] text-white text-xs px-3 py-2 rounded-lg cursor-pointer"
-                      onClick={() => setShowDatePicker(!showDatePicker)}
-                    >
-                      <Image src="/Date.png" alt="Date" width={12} height={12} />
-                      <span>{selectedDate ? formatDate(selectedDate) : "DD-MM-YYYY"}</span>
-                    </button>
-                    {showDatePicker && (
-                      <div className="absolute right-0 mt-40 z-10">
-                        <CustomDatePicker />
-                      </div>
-                    )}
-                    <button
                       className="flex items-center gap-2 bg-red-600 text-white text-xs px-3 py-2 rounded-lg"
                       onClick={() => selectedRows.length > 0 && setShowDeleteOverlay(true)}
+                      disabled={selectedRows.length === 0}
                     >
                       <Image src="/delete.png" alt="Delete" width={12} height={12} />
                       Delete
@@ -495,10 +401,8 @@ const Challenges = () => {
                   </div>
                 </div>
 
-                {/* Divider */}
-                <div className="border-t border-white/20 mb-4"></div>
+                <div className="border-t border-white/20 mb-4" />
 
-                {/* Table Headers */}
                 <div className="grid grid-cols-[40px_2fr_1fr_1.5fr_1fr_1fr_1fr_1fr] gap-3 text-[#AEAAAA] text-xs font-medium mb-2">
                   <div />
                   <div>Challenge Name</div>
@@ -510,10 +414,8 @@ const Challenges = () => {
                   <div>Action</div>
                 </div>
 
-                {/* Divider */}
-                <div className="border-t border-white/20 mb-4"></div>
+                <div className="border-t border-white/20 mb-4" />
 
-                {/* Table Content */}
                 {filteredData.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage).map((challenge, index) => (
                   <div
                     key={challenge.id}
@@ -524,10 +426,12 @@ const Challenges = () => {
                   >
                     <div className="flex items-center justify-center">
                       <div
-                        className={`w-4 h-4 border-2 rounded-full cursor-pointer ${
-                          selectedRows.includes(challenge.id) ? "bg-black border-black" : "border-white"
+                        className={`w-4 h-4 border-2 rounded-full cursor-pointer flex items-center justify-center ${
+                          selectedRows.includes(challenge.id) ? "border-black bg-black" : "border-white"
                         }`}
-                      />
+                      >
+                        {selectedRows.includes(challenge.id) && <div className="w-2 h-2 bg-white rounded-full" />}
+                      </div>
                     </div>
                     <div className="truncate">{challenge.name}</div>
                     <div className="flex items-center gap-2">
@@ -541,9 +445,7 @@ const Challenges = () => {
                         className={`px-2 py-1 rounded text-xs ${
                           challenge.status === "ongoing"
                             ? "bg-[#E7F7EF] text-[#0CAF60]"
-                            : challenge.status === "completed"
-                            ? "bg-[#D8CBFD] text-[#551DEC]"
-                            : "bg-gray-500 text-white"
+                            : "bg-[#D8CBFD] text-[#551DEC]"
                         }`}
                       >
                         {challenge.status}
@@ -553,7 +455,10 @@ const Challenges = () => {
                     <div className="relative">
                       <div
                         className="flex items-center gap-2 cursor-pointer"
-                        onClick={() => handleActionClick(index)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleActionClick(index);
+                        }}
                       >
                         <span className="text-xs">Action</span>
                         <Image src="/dropdown.png" alt="Dropdown" width={16} height={16} />
@@ -569,7 +474,11 @@ const Challenges = () => {
                           </div>
                           <div
                             className="flex items-center gap-2 px-2 py-2 hover:bg-gray-100 cursor-pointer text-xs"
-                            onClick={() => setShowDeleteOverlay(true)}
+                            onClick={() => {
+                              setSelectedRows([challenge.id]);
+                              setShowDeleteOverlay(true);
+                              setShowActionDropdown(null);
+                            }}
                           >
                             <Image src="/deletered.png" alt="Delete" width={12} height={12} />
                             Delete
@@ -580,9 +489,8 @@ const Challenges = () => {
                   </div>
                 ))}
 
-                {/* Divider with Pagination */}
                 <div className="relative mt-6">
-                  <div className="border-t border-white/20"></div>
+                  <div className="border-t border-white/20" />
                   <div className="flex flex-col sm:flex-row justify-between items-center mt-4 text-white">
                     <div className="flex items-center gap-2 mb-2 sm:mb-0">
                       <span className="text-xs">Show Result:</span>
@@ -638,43 +546,21 @@ const Challenges = () => {
             )}
           </div>
 
-          {/* Overlays */}
           {showCreateChallengeOverlay && (
-        <CreateChallengeOverlay
-          onClose={() => {
-            setShowCreateChallengeOverlay(false);
-            setSelectedChallenge(null);
-            setShowSuccessOverlay(false); // Reset success state when closing
-          }}
-          onSubmit={async (data) => {
-            await handleCreateChallengeSubmit(data);
-            // Keep the overlay open to show success
-          }}
-          isEditing={!!selectedChallenge}
-          challengeToEdit={selectedChallenge}
-        />
-      )}
-        {showSuccessOverlay && (
-            <div className="fixed inset-0 bg-black/70 flex justify-center items-center z-50">
-            <div className="bg-[#202022] rounded-lg p-6 text-white w-80 text-center">
-                <Image src="/success.png" alt="Success" width={100} height={100} className="mx-auto mb-4" />
-                <h2 className="text-xl font-bold mb-4">Success!</h2>
-                <p className="text-xs mb-6">
-                Challenge {selectedChallenge ? "updated" : "created"} successfully.
-                </p>
-                <button
-                className="w-full h-12 bg-black text-white rounded-md hover:bg-green-600"
-                onClick={() => {
-                    setShowSuccessOverlay(false);
-                    setShowCreateChallengeOverlay(false);
-                    setSelectedChallenge(null);
-                }}
-                >
-                Proceed
-                </button>
-            </div>
-            </div>
-        )}
+            <CreateChallengeOverlay
+              onClose={() => {
+                setShowCreateChallengeOverlay(false);
+                setChallengeToEdit(null);
+              }}
+              challengeToEdit={challengeToEdit}
+              onSubmit={async (data) => {
+                await handleCreateChallengeSubmit(data);
+              }}
+              clans={clans} // Pass clans as prop
+              levels={levels} // Pass levels as prop
+            />
+          )}
+
           {showDeleteOverlay && (
             <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50">
               <div className="bg-[#202022] rounded-lg p-6 text-white w-80 text-center">
@@ -700,6 +586,72 @@ const Challenges = () => {
       </div>
     </div>
   );
+
+  async function handleCreateChallengeSubmit(newChallenge: ChallengeFormData) {
+    try {
+      const token = localStorage.getItem("access_token");
+      if (!token) throw new Error("No access token found");
+
+      const queryParams = new URLSearchParams({
+        challenge_id: newChallenge.id || "",
+        name: newChallenge.challengeName,
+        description: newChallenge.challengeDescription,
+        launch_date: newChallenge.launchDate ? newChallenge.launchDate.toISOString().split("T")[0] : "",
+        reward: newChallenge.challengeReward,
+        duration: `${newChallenge.challengeDuration.days.toString().padStart(2, "0")}:${newChallenge.challengeDuration.hours
+          .toString()
+          .padStart(2, "0")}:${newChallenge.challengeDuration.minutes.toString().padStart(2, "0")}:${newChallenge.challengeDuration.seconds
+          .toString()
+          .padStart(2, "0")}`,
+        participants: getParticipantType(newChallenge.participantType),
+      }).toString();
+
+      const formData = new FormData();
+      if (newChallenge.selectedClans.length > 0) {
+        newChallenge.selectedClans.forEach((clan) => formData.append("clan", clan));
+      }
+      if (newChallenge.selectedLevels.length > 0) {
+        newChallenge.selectedLevels.forEach((level) => formData.append("level", level));
+      }
+      if (newChallenge.specificUsers) {
+        newChallenge.specificUsers.split(",").forEach((user) => formData.append("specific_users", user.trim()));
+      }
+      if (newChallenge.image) {
+        formData.append("image", newChallenge.image);
+      }
+
+      const url = newChallenge.id
+        ? `${API_BASE_URL}/admin/challenge/update_challenge?${queryParams}`
+        : `${API_BASE_URL}/admin/challenge/create_challenge?${queryParams}`;
+      const response = await fetch(url, {
+        method: newChallenge.id ? "PUT" : "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`Failed to submit challenge: ${JSON.stringify(errorData)}`);
+      }
+
+      await fetchChallenges();
+      setShowCreateChallengeOverlay(false);
+      setChallengeToEdit(null);
+    } catch (error) {
+      console.error("Challenge submission error:", error);
+      setError((error as Error).message);
+    }
+  }
+
+  function getParticipantType(type: string): string {
+    switch (type) {
+      case "All Users": return "all_users";
+      case "Clan(s)": return "clan";
+      case "Level(s)": return "level";
+      case "Specific User(s)": return "specific_users";
+      default: return "all_users";
+    }
+  }
 };
 
 export default Challenges;

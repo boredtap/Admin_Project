@@ -36,6 +36,9 @@ const Dashboard: React.FC = () => {
     recentUserActivity: [],
   });
 
+  const [activeMetric, setActiveMetric] = useState<"coin" | "users">("coin");
+  const [activePeriod, setActivePeriod] = useState<"thisYear" | "lastYear">("thisYear");
+
   const isTokenExpired = (token: string): boolean => {
     const payload = JSON.parse(atob(token.split(".")[1]));
     return payload.exp * 1000 < Date.now();
@@ -82,7 +85,7 @@ const Dashboard: React.FC = () => {
         });
         if (!response.ok) throw new Error(`Error fetching ${key}: ${response.statusText}`);
         const data = await response.json();
-        console.log(`Fetched ${key}:`, data); // Debug log
+        console.log(`Fetched ${key}:`, data);
 
         setDashboardData((prev) => {
           if (key === "totalUsers") {
@@ -139,11 +142,23 @@ const Dashboard: React.FC = () => {
   }, [fetchData, refreshToken]);
 
   useEffect(() => {
-    const coinActivity: { [key: string]: number } = typeof dashboardData.recentCoinActivity[0]?.data === 'object' ? dashboardData.recentCoinActivity[0].data : {};
-    const userActivity: { [key: string]: number } = typeof dashboardData.recentUserActivity[0]?.data === 'object' ? dashboardData.recentUserActivity[0].data : {};
+    const coinActivityThisYear: { [key: string]: number } = typeof dashboardData.recentCoinActivity[0]?.data === 'object' ? dashboardData.recentCoinActivity[0].data : {};
+    const userActivityThisYear: { [key: string]: number } = typeof dashboardData.recentUserActivity[0]?.data === 'object' ? dashboardData.recentUserActivity[0].data : {};
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    const coinData = months.map((_, idx) => coinActivity[(idx + 1).toString()] || 0);
-    const userData = months.map((_, idx) => userActivity[(idx + 1).toString()] || 0);
+    
+    // Simulate last year's data (in a real app, you'd fetch this from your API)
+    const coinActivityLastYear = Object.fromEntries(
+      Object.entries(coinActivityThisYear).map(([key, value]) => [key, Math.round(value * 0.8)])
+    );
+    const userActivityLastYear = Object.fromEntries(
+      Object.entries(userActivityThisYear).map(([key, value]) => [key, Math.round(value * 0.8)])
+    );
+
+    const dataSource = activePeriod === "thisYear" 
+      ? (activeMetric === "coin" ? coinActivityThisYear : userActivityThisYear)
+      : (activeMetric === "coin" ? coinActivityLastYear : userActivityLastYear);
+    
+    const chartData = months.map((_, idx) => dataSource[(idx + 1).toString()] || 0);
 
     const ctx = document.getElementById("recent-activities-graph") as HTMLCanvasElement;
     if (recentActivitiesChartRef.current) recentActivitiesChartRef.current.destroy();
@@ -152,15 +167,25 @@ const Dashboard: React.FC = () => {
         type: "line",
         data: {
           labels: months,
-          datasets: [
-            { label: "Total Coin Earned", data: coinData, borderColor: "#F28C38", borderWidth: 2, fill: false, tension: 0.1 },
-            { label: "Total Users", data: userData, borderColor: "#0CAF60", borderWidth: 2, fill: false, tension: 0.1 },
-          ],
+          datasets: [{
+            label: activeMetric === "coin" ? "Total Coin Earned" : "Total Users",
+            data: chartData,
+            borderColor: activeMetric === "coin" ? "#F28C38" : "#0CAF60",
+            borderWidth: 2,
+            fill: false,
+            tension: 0.1
+          }],
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          scales: { x: { title: { display: true, text: "Months" } }, y: { title: { display: true, text: "Count" }, beginAtZero: true } },
+          scales: { 
+            x: { title: { display: true, text: "Months" } }, 
+            y: { 
+              title: { display: true, text: activeMetric === "coin" ? "Coins" : "Users" }, 
+              beginAtZero: true 
+            } 
+          },
           plugins: { legend: { position: "top" } },
         },
       });
@@ -169,7 +194,7 @@ const Dashboard: React.FC = () => {
     return () => {
       if (recentActivitiesChartRef.current) recentActivitiesChartRef.current.destroy();
     };
-  }, [dashboardData.recentCoinActivity, dashboardData.recentUserActivity]);
+  }, [dashboardData.recentCoinActivity, dashboardData.recentUserActivity, activeMetric, activePeriod]);
 
   useEffect(() => {
     const userLevelData = dashboardData.userLevels.map((item) => item.total_users);
@@ -254,16 +279,51 @@ const Dashboard: React.FC = () => {
 
             <div className="mb-8 rounded-lg border border-white/20 bg-[#202022] p-6">
               <h2 className="mb-4 text-sm text-orange-400 font-semibold sm:text-xs">Recent Activities</h2>
-              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
-                <div className="flex gap-3">
-                  <span className="border-b-2 border-orange-400 pb-1 text-sm font-semibold sm:text-xs">Total Coin Earned</span>
+              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div className="flex gap-3 items-center">
+                  <button
+                    className={`pb-1 text-sm sm:text-xs font-semibold cursor-pointer transition-colors ${
+                      activeMetric === "coin" 
+                        ? "border-b-2 border-orange-400 text-orange-400" 
+                        : "text-gray-500 hover:text-orange-300"
+                    }`}
+                    onClick={() => setActiveMetric("coin")}
+                  >
+                    Total Coin Earned
+                  </button>
                   <span className="text-gray-500 text-sm sm:text-xs">|</span>
-                  <span className="text-gray-500 text-sm sm:text-xs">Total Users</span>
-                </div>
-                <div className="flex gap-3">
-                  <span className="border-b-2 border-orange-400 pb-1 text-sm font-semibold sm:text-xs">This Year</span>
+                  <button
+                    className={`pb-1 text-sm sm:text-xs font-semibold cursor-pointer transition-colors ${
+                      activeMetric === "users" 
+                        ? "border-b-2 border-orange-400 text-orange-400" 
+                        : "text-gray-500 hover:text-orange-300"
+                    }`}
+                    onClick={() => setActiveMetric("users")}
+                  >
+                    Total Users
+                  </button>
+                  <span className="text-gray-500 text-sm sm:text-xs ml-4">|</span>
+                  <button
+                    className={`pb-1 text-sm sm:text-xs font-semibold cursor-pointer transition-colors ${
+                      activePeriod === "thisYear" 
+                        ? "border-b-2 border-orange-400 text-orange-400" 
+                        : "text-gray-500 hover:text-orange-300"
+                    }`}
+                    onClick={() => setActivePeriod("thisYear")}
+                  >
+                    This Year
+                  </button>
                   <span className="text-gray-500 text-sm sm:text-xs">|</span>
-                  <span className="text-gray-500 text-sm sm:text-xs">Last Year</span>
+                  <button
+                    className={`pb-1 text-sm sm:text-xs font-semibold cursor-pointer transition-colors ${
+                      activePeriod === "lastYear" 
+                        ? "border-b-2 border-orange-400 text-orange-400" 
+                        : "text-gray-500 hover:text-orange-300"
+                    }`}
+                    onClick={() => setActivePeriod("lastYear")}
+                  >
+                    Last Year
+                  </button>
                 </div>
               </div>
               <div className="h-80 sm:h-96"><canvas id="recent-activities-graph" /></div>

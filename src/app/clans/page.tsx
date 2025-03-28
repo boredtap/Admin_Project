@@ -527,6 +527,7 @@ const Clans: React.FC = () => {
                             onClick={(e) => {
                               e.stopPropagation();
                               handleResume(clan.id);
+                              setShowActionDropdown(null); // Close dropdown
                             }}
                           >
                             <Image src="/edit.png" alt="Resume" width={12} height={12} />
@@ -538,6 +539,7 @@ const Clans: React.FC = () => {
                             onClick={(e) => {
                               e.stopPropagation();
                               handleApprove(clan.id);
+                              setShowActionDropdown(null); // Close dropdown
                             }}
                           >
                             <Image src="/edit.png" alt="Approve" width={12} height={12} />
@@ -550,6 +552,7 @@ const Clans: React.FC = () => {
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleApprove(clan.id);
+                                setShowActionDropdown(null); // Close dropdown
                               }}
                             >
                               <Image src="/edit.png" alt="Approve" width={12} height={12} />
@@ -560,6 +563,7 @@ const Clans: React.FC = () => {
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleDisband(clan.id);
+                                setShowActionDropdown(null); // Close dropdown
                               }}
                             >
                               <Image src="/deletered.png" alt="Disband" width={12} height={12} />

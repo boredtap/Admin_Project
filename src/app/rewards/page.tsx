@@ -1,5 +1,3 @@
-// src/app/rewards/page.tsx
-
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
@@ -16,6 +14,7 @@ interface Reward {
   title: string;
   reward: string;
   beneficiary: string;
+  beneficiaryList: string[];
   expiryDate: string;
   status: string;
   claimRate: string;
@@ -23,14 +22,19 @@ interface Reward {
 
 interface RewardFormData {
   id?: string;
-  title: string;
-  reward: string;
-  beneficiary: string;
+  rewardTitle: string;
+  rewardAmount: string;
   expiryDate: Date | null;
+  beneficiaryType: string;
+  selectedClans: string[];
+  selectedLevels: string[];
+  specificUsers: string;
+  telegramUserId?: string;
+  image: File | null;
 }
 
 const Rewards: React.FC = () => {
-  const [selectedRow, setSelectedRow] = useState<string | null>(null); // Changed from array to single value
+  const [selectedRow, setSelectedRow] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"All Rewards" | "On-going Rewards" | "Claimed Rewards">("All Rewards");
   const [showActionDropdown, setShowActionDropdown] = useState<number | null>(null);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
@@ -54,10 +58,12 @@ const Rewards: React.FC = () => {
     beneficiary: { [key: string]: boolean };
   }>({
     status: { "On-going": false, Claimed: false },
-    beneficiary: { "All users": false, Clan: false, Level: false },
+    beneficiary: { "All users": false, Clans: false, Levels: false, "Specific User(s)": false },
   });
   const [showCreateNewReward, setShowCreateNewReward] = useState(false);
   const [rewardToEdit, setRewardToEdit] = useState<RewardFormData | null>(null);
+  const [clans, setClans] = useState<string[]>([]);
+  const [levels, setLevels] = useState<string[]>([]);
 
   const router = useRouter();
 
@@ -98,7 +104,7 @@ const Rewards: React.FC = () => {
     status: string;
     claim_rate: string;
   }
-  
+
   const fetchRewards = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -113,19 +119,38 @@ const Rewards: React.FC = () => {
       });
       if (!response.ok) throw new Error("Failed to fetch rewards");
       const data: RawReward[] = await response.json();
-      const mappedData = data.map((reward) => ({
-        id: reward.id,
-        title: reward.reward_title,
-        reward: reward.reward.toString(),
-        beneficiary: reward.beneficiary[0] || "all_users",
-        expiryDate: reward.expiry_date,
-        status: reward.status,
-        claimRate: reward.claim_rate.toString(),
-      }));
+      const mappedData = data.map((reward) => {
+        let displayBeneficiary: string;
+        if (reward.beneficiary.length > 1) {
+          const isClan = reward.beneficiary.some((b) =>
+            clans.some((clan) => clan.toLowerCase() === b.toLowerCase())
+          );
+          const isLevel = reward.beneficiary.some((b) =>
+            levels.some((level) => level.toLowerCase() === b.toLowerCase())
+          );
+          displayBeneficiary = isClan ? "Clans" : isLevel ? "Levels" : reward.beneficiary[0];
+        } else {
+          displayBeneficiary = reward.beneficiary[0] || "all_users";
+        }
+
+        return {
+          id: reward.id,
+          title: reward.reward_title,
+          reward: reward.reward.toString(),
+          beneficiary: displayBeneficiary,
+          beneficiaryList: reward.beneficiary,
+          expiryDate: reward.expiry_date,
+          status: reward.status,
+          claimRate: reward.claim_rate.toString(),
+        };
+      });
+
+      const sortedData = mappedData.sort((a, b) => new Date(b.expiryDate).getTime() - new Date(a.expiryDate).getTime());
+
       setRewardsData({
-        "All Rewards": mappedData,
-        "On-going Rewards": mappedData.filter((r) => r.status === "on_going"),
-        "Claimed Rewards": mappedData.filter((r) => r.status === "claimed"),
+        "All Rewards": sortedData,
+        "On-going Rewards": sortedData.filter((r) => r.status === "on_going"),
+        "Claimed Rewards": sortedData.filter((r) => r.status === "claimed"),
       });
     } catch (err) {
       setError((err as Error).message);
@@ -134,11 +159,43 @@ const Rewards: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [router, refreshToken]);
+  }, [router, refreshToken, clans, levels]);
 
   useEffect(() => {
-    fetchRewards();
-  }, [fetchRewards]);
+    const fetchClansAndLevels = async () => {
+      const token = localStorage.getItem("access_token");
+      if (!token) return;
+
+      try {
+        const [clanResponse, levelResponse] = await Promise.all([
+          fetch(`${API_BASE_URL}/admin/clan/get_clans?category=all_clans&page=1&page_size=20`, {
+            headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+          }),
+          fetch(`${API_BASE_URL}/admin/levels/get_levels`, {
+            headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+          }),
+        ]);
+
+        if (clanResponse.ok) {
+          const clanData = await clanResponse.json();
+          setClans(clanData.map((clan: { name: string }) => clan.name));
+        }
+
+        if (levelResponse.ok) {
+          const levelData = await levelResponse.json();
+          setLevels(levelData.map((level: { name: string }) => level.name.toLowerCase()));
+        }
+      } catch (err) {
+        console.error("Error fetching clans or levels:", err);
+      }
+    };
+
+    fetchClansAndLevels();
+  }, []);
+
+  useEffect(() => {
+    if (clans.length > 0 && levels.length > 0) fetchRewards();
+  }, [fetchRewards, clans, levels]);
 
   const handleFilterChange = (category: "status" | "beneficiary", value: string) => {
     setFilters((prev) => ({
@@ -148,7 +205,7 @@ const Rewards: React.FC = () => {
   };
 
   const handleRowClick = (rewardId: string) => {
-    setSelectedRow(rewardId === selectedRow ? null : rewardId); // Toggle selection
+    setSelectedRow(rewardId === selectedRow ? null : rewardId);
   };
 
   const handleActionClick = (index: number) => {
@@ -158,12 +215,25 @@ const Rewards: React.FC = () => {
   const handleEditReward = (reward: Reward) => {
     setRewardToEdit({
       id: reward.id,
-      title: reward.title,
-      reward: reward.reward,
-      beneficiary: reward.beneficiary,
+      rewardTitle: reward.title,
+      rewardAmount: reward.reward,
       expiryDate: reward.expiryDate ? new Date(reward.expiryDate) : null,
+      beneficiaryType:
+        reward.beneficiary === "Clans"
+          ? "Clan(s)"
+          : reward.beneficiary === "Levels"
+          ? "Level(s)"
+          : reward.beneficiary === "all_users"
+          ? "All Users"
+          : "Specific User(s)",
+      selectedClans: reward.beneficiary === "Clans" ? reward.beneficiaryList : [],
+      selectedLevels: reward.beneficiary === "Levels" ? reward.beneficiaryList : [],
+      specificUsers: reward.beneficiary === "specific_users" ? reward.beneficiaryList[0] : "",
+      telegramUserId: reward.beneficiary === "specific_users" ? reward.beneficiaryList[0] : "",
+      image: null,
     });
     setShowCreateNewReward(true);
+    setShowActionDropdown(null); // Close dropdown after edit
   };
 
   const handleDelete = async () => {
@@ -177,6 +247,7 @@ const Rewards: React.FC = () => {
       await fetchRewards();
       setSelectedRow(null);
       setShowDeleteOverlay(false);
+      setShowActionDropdown(null); // Close dropdown after delete
     } catch (error) {
       console.error("Error deleting reward:", error);
     }
@@ -198,30 +269,26 @@ const Rewards: React.FC = () => {
   };
 
   const filteredData = rewardsData[activeTab].filter((reward) => {
-    // Status filter
     const statusFiltersActive = Object.values(filters.status).some((v) => v);
     const statusMatch = statusFiltersActive
-      ? filters.status["On-going"] && reward.status === "on_going" ||
-        filters.status["Claimed"] && reward.status === "claimed"
-      : true; // If no status filters are active, include all
-  
-    // Beneficiary filter
+      ? (filters.status["On-going"] && reward.status === "on_going") ||
+        (filters.status["Claimed"] && reward.status === "claimed")
+      : true;
+
     const beneficiaryFiltersActive = Object.values(filters.beneficiary).some((v) => v);
     const beneficiaryMatch = beneficiaryFiltersActive
       ? (filters.beneficiary["All users"] && reward.beneficiary === "all_users") ||
-        (filters.beneficiary["Clan"] && reward.beneficiary === "clan") ||
-        (filters.beneficiary["Level"] && reward.beneficiary === "level") ||
-        (filters.beneficiary["Specific User(s)"] && reward.beneficiary === "specific_users")
-      : true; // If no beneficiary filters are active, include all
-  
-    // Search filter
+        (filters.beneficiary["Clans"] && reward.beneficiary === "Clans") ||
+        (filters.beneficiary["Levels"] && reward.beneficiary === "Levels") ||
+        (filters.beneficiary["Specific User(s)"] && reward.beneficiaryList[0]?.includes("specific_users"))
+      : true;
+
     const searchMatch =
       searchTerm === "" ||
       reward.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       reward.status.toLowerCase().includes(searchTerm.toLowerCase()) ||
       reward.beneficiary.toLowerCase().includes(searchTerm.toLowerCase());
-  
-    // Combine all filters
+
     return statusMatch && beneficiaryMatch && searchMatch;
   });
 
@@ -275,7 +342,7 @@ const Rewards: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="border-t border-white/20 mb-4"></div>
+                <div className="border-t border-white/20 mb-4" />
 
                 <div className="flex justify-between items-center mb-4">
                   <div className="flex items-center bg-[#19191A] rounded-lg w-full max-w-[500px] h-[54px] p-4 relative sm:h-10">
@@ -333,7 +400,7 @@ const Rewards: React.FC = () => {
                     </button>
                     <button
                       className="flex items-center gap-2 bg-red-600 text-white text-xs px-3 py-2 rounded-lg"
-                      onClick={() => selectedRow && setShowDeleteOverlay(true)} // Only show if row selected
+                      onClick={() => selectedRow && setShowDeleteOverlay(true)}
                       disabled={!selectedRow}
                     >
                       <Image src="/delete.png" alt="Delete" width={12} height={12} />
@@ -342,9 +409,8 @@ const Rewards: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="border-t border-white/20 mb-4"></div>
+                <div className="border-t border-white/20 mb-4" />
 
-                {/* Table Headers */}
                 <div className="grid grid-cols-[40px_2fr_1fr_1.5fr_1fr_1fr_1fr_1fr] gap-3 text-[#AEAAAA] text-xs font-medium mb-2">
                   <div />
                   <div>Reward Title</div>
@@ -356,7 +422,7 @@ const Rewards: React.FC = () => {
                   <div>Action</div>
                 </div>
 
-                <div className="border-t border-white/20 mb-4"></div>
+                <div className="border-t border-white/20 mb-4" />
 
                 {filteredData.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage).map((reward, index) => (
                   <div
@@ -369,14 +435,10 @@ const Rewards: React.FC = () => {
                     <div className="flex items-center justify-center">
                       <div
                         className={`w-4 h-4 border-2 rounded-full cursor-pointer flex items-center justify-center ${
-                          selectedRow === reward.id
-                            ? "border-black bg-black"
-                            : "border-white"
+                          selectedRow === reward.id ? "border-black bg-black" : "border-white"
                         }`}
                       >
-                        {selectedRow === reward.id && (
-                          <div className="w-2 h-2 bg-white rounded-full" />
-                        )}
+                        {selectedRow === reward.id && <div className="w-2 h-2 bg-white rounded-full" />}
                       </div>
                     </div>
                     <div className="truncate">{reward.title}</div>
@@ -407,7 +469,7 @@ const Rewards: React.FC = () => {
                       <div
                         className="flex items-center gap-2 cursor-pointer"
                         onClick={(e) => {
-                          e.stopPropagation(); // Prevent row selection when clicking action
+                          e.stopPropagation();
                           handleActionClick(index);
                         }}
                       >
@@ -437,7 +499,7 @@ const Rewards: React.FC = () => {
                 ))}
 
                 <div className="relative mt-6">
-                  <div className="border-t border-white/20"></div>
+                  <div className="border-t border-white/20" />
                   <div className="flex flex-col sm:flex-row justify-between items-center mt-4 text-white">
                     <div className="flex items-center gap-2 mb-2 sm:mb-0">
                       <span className="text-xs">Show Result:</span>
@@ -500,21 +562,7 @@ const Rewards: React.FC = () => {
               setShowCreateNewReward(false);
               setRewardToEdit(null);
             }}
-            rewardToEdit={
-              rewardToEdit
-                ? {
-                    id: rewardToEdit.id,
-                    rewardTitle: rewardToEdit.title,
-                    rewardAmount: rewardToEdit.reward,
-                    expiryDate: rewardToEdit.expiryDate ? new Date(rewardToEdit.expiryDate) : null,
-                    beneficiaryType: rewardToEdit.beneficiary,
-                    selectedClans: [],
-                    selectedLevels: [],
-                    specificUsers: "",
-                    image: null,
-                  }
-                : null
-            }
+            rewardToEdit={rewardToEdit}
             onSubmit={async () => {
               await fetchRewards();
             }}
@@ -535,7 +583,7 @@ const Rewards: React.FC = () => {
               </button>
               <button
                 className="text-white underline bg-transparent border-none cursor-pointer text-xs"
-                onClick={() => setShowDeleteOverlay(false)} // Fixed to close overlay
+                onClick={() => setShowDeleteOverlay(false)}
               >
                 Back
               </button>

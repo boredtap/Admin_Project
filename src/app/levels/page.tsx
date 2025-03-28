@@ -12,7 +12,7 @@ import { API_BASE_URL } from "@/config/api";
 interface Level {
   id: string;
   name: string;
-  badge: string;
+  badge: string; // This will store the image URL or blob URL after fetching
   level: number;
   requirement: string;
 }
@@ -102,18 +102,57 @@ const Levels: React.FC = () => {
         token = await refreshToken();
         if (!token) return;
       }
-
+      console.log("Token used for fetch:", token);
+  
+      // Fetch level data
       const response = await fetch(`${API_BASE_URL}/admin/levels/get_levels`, {
         headers: {
           Authorization: `Bearer ${token}`,
           Accept: "application/json",
         },
       });
-
-      if (!response.ok) throw new Error("Failed to fetch levels");
-
+  
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to fetch levels: ${response.status} - ${errorText}`);
+      }
+  
       const data: Level[] = await response.json();
-      setLevelsData({ Levels: data });
+      console.log("Fetched levels data:", data);
+  
+      // Fetch badge images for each level
+      const levelsWithImages = await Promise.all(
+        data.map(async (level) => {
+          try {
+            const url = `/api/admin/dashboard/images/image?image_id=${level.id}`;
+            console.log("Fetching image from:", url);
+            const imageResponse = await fetch(url, {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                // Remove Accept header to allow any content type (e.g., image/png)
+              },
+            });
+  
+            if (!imageResponse.ok) {
+              const errorText = await imageResponse.text();
+              throw new Error(
+                `Failed to fetch badge for level ${level.id}: ${imageResponse.status} - ${errorText}`
+              );
+            }
+  
+            const contentType = imageResponse.headers.get("Content-Type");
+            console.log(`Badge image Content-Type for level ${level.id}:`, contentType);
+  
+            const imageBlob = await imageResponse.blob();
+            return { ...level, badge: URL.createObjectURL(imageBlob) };
+          } catch (err) {
+            console.error(`Error fetching badge for level ${level.id}:`, err);
+            return { ...level, badge: "/logo.png" };
+          }
+        })
+      );
+  
+      setLevelsData({ Levels: levelsWithImages });
       setError(null);
     } catch (err) {
       setError((err as Error).message);
@@ -121,6 +160,7 @@ const Levels: React.FC = () => {
       router.push("/signin");
     }
   }, [router, refreshToken]);
+
 
   useEffect(() => {
     fetchLevels();
@@ -172,6 +212,7 @@ const Levels: React.FC = () => {
   const handleDelete = (levelId: string) => {
     setLevelToDelete(levelId);
     setShowDeleteOverlay(true);
+    setShowActionDropdown(null); // Close dropdown when delete is clicked
   };
 
   const handleDeleteConfirmed = async () => {
@@ -363,7 +404,17 @@ const Levels: React.FC = () => {
                         />
                       </div>
                       <div className="truncate">{decodeLevelName(level.name) || "N/A"}</div>
-                      <div className="truncate">{level.badge || "N/A"}</div>
+                      <div className="flex items-center gap-2">
+                        <Image
+                          src={level.badge || "/logo.png"}
+                          alt="Badge"
+                          width={16}
+                          height={16}
+                          className="object-cover"
+                        />
+                        {/* Optionally remove the text if you only want the image */}
+                        <span className="truncate">{level.badge ? "Badge" : "N/A"}</span>
+                      </div>
                       <div>{level.level || "N/A"}</div>
                       <div className="flex items-center gap-2">
                         <Image src="/logo.png" alt="Requirement" width={16} height={16} />
@@ -394,6 +445,7 @@ const Levels: React.FC = () => {
                                   badgeImage: null,
                                 });
                                 setShowCreateOverlay(true);
+                                setShowActionDropdown(null); // Close dropdown
                               }}
                             >
                               <Image src="/edit.png" alt="Edit" width={12} height={12} />
@@ -404,6 +456,7 @@ const Levels: React.FC = () => {
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleDelete(level.id);
+                                // setShowActionDropdown(null) is already in handleDelete
                               }}
                             >
                               <Image src="/deletered.png" alt="Delete" width={12} height={12} />
@@ -482,33 +535,38 @@ const Levels: React.FC = () => {
               }}
               levelToEdit={levelToEdit}
               onSubmit={async (newLevel) => {
-                setLevelsData((prev) => ({
-                  ...prev,
-                  Levels: levelToEdit
-                    ? prev.Levels.map((l) =>
-                        l.id === newLevel.id
-                          ? {
-                              id: newLevel.id,
-                              name: newLevel.name,
-                              badge: l.badge, // Preserve existing badge unless updated
-                              level: parseInt(newLevel.level),
-                              requirement: newLevel.requirement,
-                            }
-                          : l
-                      )
-                    : [
-                        ...prev.Levels,
-                        {
-                          id: newLevel.id,
-                          name: newLevel.name,
-                          badge: newLevel.badgeImage?.name || "Uploaded Badge", // Placeholder
-                          level: parseInt(newLevel.level),
-                          requirement: newLevel.requirement,
-                        },
-                      ],
-                }));
-                setShowCreateOverlay(false);
-                setLevelToEdit(null);
+                try {
+                  const token = localStorage.getItem("access_token");
+                  if (!token) throw new Error("No access token found");
+
+                  const formData = new FormData();
+                  formData.append("name", newLevel.name);
+                  formData.append("requirement", newLevel.requirement);
+                  formData.append("level", newLevel.level);
+                  if (newLevel.badgeImage) {
+                    formData.append("badge", newLevel.badgeImage);
+                  }
+
+                  const url = newLevel.id
+                    ? `${API_BASE_URL}/admin/levels/update_level/${newLevel.id}`
+                    : `${API_BASE_URL}/admin/levels/create_level`;
+                  const method = newLevel.id ? "PUT" : "POST";
+
+                  const response = await fetch(url, {
+                    method,
+                    headers: { Authorization: `Bearer ${token}` },
+                    body: formData,
+                  });
+
+                  if (!response.ok) throw new Error("Failed to submit level");
+
+                  await fetchLevels(); // Refresh the levels list with updated images
+                  setShowCreateOverlay(false);
+                  setLevelToEdit(null);
+                } catch (err) {
+                  setError((err as Error).message);
+                  console.error("Level submission error:", err);
+                }
               }}
             />
           )}

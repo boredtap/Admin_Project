@@ -45,6 +45,7 @@ const ClanProfileOverlay: React.FC<ClanProfileOverlayProps> = ({
   const [topEarners, setTopEarners] = useState<TopEarner[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [clanImage, setClanImage] = useState<string | null>(null);
+
   
   useEffect(() => {
     const fetchClanProfile = async () => {
@@ -141,13 +142,13 @@ const ClanProfileOverlay: React.FC<ClanProfileOverlayProps> = ({
         </div>
 
         <div className="flex flex-col items-center mb-6">
-          <div className="mb-2">
+          <div className="mb-2 w-20 h-20 relative">
             <Image
               src={clanImage || clan.image_url || "/logo.png"}
               alt="Clan"
-              width={80}
-              height={80}
-              className="rounded-full"
+              fill
+              className="rounded-full object-cover"
+              sizes="80px"
             />
           </div>
           <div className="text-center">
