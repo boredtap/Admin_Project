@@ -180,7 +180,7 @@ const Users: React.FC = () => {
                     <span
                       key={tab}
                       className={`text-xs cursor-pointer pb-1 ${
-                        activeTab === tab ? "text-white font-bold border-b-2 border-orange-500" : "text-gray-500"
+                        activeTab === tab ? "text-white font-bold border-b-2 border-[#f9b54c]" : "text-gray-500"
                       }`}
                       onClick={() => setActiveTab(tab as typeof activeTab)}
                     >
@@ -414,7 +414,7 @@ const Users: React.FC = () => {
                         <span
                           key={num}
                           className={`px-2 py-1 rounded text-xs cursor-pointer ${
-                            currentPage === num ? "bg-orange-500 text-black" : ""
+                            currentPage === num ? "bg-[#f9b54c] text-black" : ""
                           }`}
                           onClick={() => setCurrentPage(num)}
                         >

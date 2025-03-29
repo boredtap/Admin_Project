@@ -86,7 +86,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({ query }) => {
     const parts = text.split(regex);
     return parts.map((part, index) =>
       part.toLowerCase() === query.toLowerCase() ? (
-        <span key={index} className="text-orange-400 font-bold">
+        <span key={index} className="text-[#f9b54c] font-bold">
           {part}
         </span>
       ) : (
@@ -131,7 +131,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({ query }) => {
             : "N/A"}
         </span>
         <span className="text-gray-400 mx-2">•</span>
-        <span className="text-orange-400">
+        <span className="text-[#f9b54c]">
           {typeof item.level_name === "string" ? item.level_name : "N/A"}
         </span>
       </>
@@ -159,7 +159,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({ query }) => {
   return (
     <div className="fixed top-28 left-44 right-4 bottom-0 bg-[#202022] z-40 text-white overflow-y-auto lg:left-52 lg:right-2 sm:left-36 sm:right-4 xs:left-0 xs:right-4">
       <div className="p-8 md:p-6 sm:p-4">
-        <h2 className="text-2xl font-bold text-orange-400 mb-6">
+        <h2 className="text-2xl font-bold text-[#f9b54c] mb-6">
           Search Results for: {query}
         </h2>
 
@@ -187,7 +187,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({ query }) => {
                     </div>
                     <Link
                       href={getViewLink(item, category)}
-                      className="text-sm text-orange-400 hover:underline"
+                      className="text-sm text-[#f9b54c] hover:underline"
                     >
                       View
                     </Link>

@@ -252,7 +252,7 @@ const Clans: React.FC = () => {
               className={`text-center py-1 rounded cursor-pointer text-xs ${
                 date
                   ? selectedDate && date.toDateString() === selectedDate.toDateString()
-                    ? "bg-orange-500 text-white"
+                    ? "bg-[#f9b54c] text-white"
                     : "hover:bg-gray-100"
                   : ""
               }`}
@@ -353,7 +353,7 @@ const Clans: React.FC = () => {
                     <span
                       key={tab}
                       className={`text-xs cursor-pointer pb-1 ${
-                        activeTab === tab ? "text-white font-bold border-b-2 border-orange-500" : "text-gray-500"
+                        activeTab === tab ? "text-white font-bold border-b-2 border-[#f9b54c]" : "text-gray-500"
                       }`}
                       onClick={() => handleTabChange(tab)}
                     >
@@ -612,7 +612,7 @@ const Clans: React.FC = () => {
                         <span
                           key={num}
                           className={`px-2 py-1 rounded text-xs cursor-pointer ${
-                            currentPage === num ? "bg-orange-500 text-black" : ""
+                            currentPage === num ? "bg-[#f9b54c] text-black" : ""
                           }`}
                           onClick={() => setCurrentPage(num)}
                         >

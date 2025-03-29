@@ -135,7 +135,7 @@ const ClanProfileOverlay: React.FC<ClanProfileOverlayProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="relative text-center py-5">
-          <h1 className="text-xl font-bold text-orange-500">Clan Profile</h1>
+          <h1 className="text-xl font-bold text-[#f9b54c]">Clan Profile</h1>
           <button className="absolute right-0 top-1/2 -translate-y-1/2" onClick={onClose}>
             <Image src="/cancel.png" alt="Close" width={24} height={24} />
           </button>
@@ -170,7 +170,7 @@ const ClanProfileOverlay: React.FC<ClanProfileOverlayProps> = ({
         </div>
 
         <div className="mb-6">
-          <h3 className="text-orange-500 text-sm font-bold mb-2">Clan Details</h3>
+          <h3 className="text-[#f9b54c] text-sm font-bold mb-2">Clan Details</h3>
           <hr className="border-[#363638] mb-4" />
           <div className="flex justify-between text-sm">
             <div className="flex flex-col">
@@ -194,7 +194,7 @@ const ClanProfileOverlay: React.FC<ClanProfileOverlayProps> = ({
 
         <hr className="border-[#363638] my-4" />
         <div>
-          <h3 className="text-orange-500 text-sm font-bold mb-2">Clan Top Earners</h3>
+          <h3 className="text-[#f9b54c] text-sm font-bold mb-2">Clan Top Earners</h3>
           <hr className="border-[#363638] mb-4" />
           <div className="grid grid-cols-[48px_1fr_1fr_1fr_1fr] gap-3 text-[#AEAAAA] text-xs font-medium py-3">
             <div />

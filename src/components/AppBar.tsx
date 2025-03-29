@@ -62,7 +62,7 @@ const AppBar: React.FC<AppBarProps> = ({ screenName, isDashboard = false }) => {
       >
         {/* Left Section: Screen Name and Time/Date */}
         <div className="flex items-center gap-120 md:gap-40 min-w-0">
-          <span className="text-2xl font-bold text-orange-400 whitespace-nowrap lg:text-xl sm:text-lg truncate">
+          <span className="text-2xl font-bold text-[#f9b54c] whitespace-nowrap lg:text-xl sm:text-lg truncate">
             {screenName}
           </span>
           <div className="flex flex-col min-w-0">
@@ -106,7 +106,7 @@ const AppBar: React.FC<AppBarProps> = ({ screenName, isDashboard = false }) => {
             />
             <div className="flex flex-col text-left min-w-0">
               <span className="text-base font-bold sm:text-sm truncate">Israel A.</span>
-              <span className="text-xs text-orange-400 sm:text-[10px] truncate">Super Admin</span>
+              <span className="text-xs text-[#f9b54c] sm:text-[10px] truncate">Super Admin</span>
             </div>
           </div>
         </div>

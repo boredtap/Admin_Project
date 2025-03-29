@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import NavigationPanel from "@/components/NavigationPanel";
@@ -34,7 +34,7 @@ interface RewardFormData {
 }
 
 const Rewards: React.FC = () => {
-  const [selectedRow, setSelectedRow] = useState<string | null>(null);
+  const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<"All Rewards" | "On-going Rewards" | "Claimed Rewards">("All Rewards");
   const [showActionDropdown, setShowActionDropdown] = useState<number | null>(null);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
@@ -42,7 +42,7 @@ const Rewards: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [rowsPerPage, setRowsPerPage] = useState(8);
   const [currentPage, setCurrentPage] = useState(1);
   const [rewardsData, setRewardsData] = useState<{
     "All Rewards": Reward[];
@@ -64,8 +64,23 @@ const Rewards: React.FC = () => {
   const [rewardToEdit, setRewardToEdit] = useState<RewardFormData | null>(null);
   const [clans, setClans] = useState<string[]>([]);
   const [levels, setLevels] = useState<string[]>([]);
+  const actionDropdownRef = useRef<HTMLDivElement>(null);
 
   const router = useRouter();
+
+  // Re-enable click-outside with proper scoping
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (actionDropdownRef.current && !actionDropdownRef.current.contains(event.target as Node)) {
+        console.log("Click outside detected, closing dropdown");
+        setShowActionDropdown(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   const isTokenExpired = (token: string): boolean => {
     const payload = JSON.parse(atob(token.split(".")[1]));
@@ -205,15 +220,19 @@ const Rewards: React.FC = () => {
   };
 
   const handleRowClick = (rewardId: string) => {
-    setSelectedRow(rewardId === selectedRow ? null : rewardId);
+    setSelectedRows((prev) =>
+      prev.includes(rewardId) ? prev.filter((id) => id !== rewardId) : [...prev, rewardId]
+    );
   };
 
   const handleActionClick = (index: number) => {
+    console.log("Action clicked, toggling dropdown for index:", index);
     setShowActionDropdown(showActionDropdown === index ? null : index);
   };
 
   const handleEditReward = (reward: Reward) => {
-    setRewardToEdit({
+    console.log("handleEditReward called for reward:", reward.id);
+    const rewardData: RewardFormData = {
       id: reward.id,
       rewardTitle: reward.title,
       rewardAmount: reward.reward,
@@ -231,25 +250,32 @@ const Rewards: React.FC = () => {
       specificUsers: reward.beneficiary === "specific_users" ? reward.beneficiaryList[0] : "",
       telegramUserId: reward.beneficiary === "specific_users" ? reward.beneficiaryList[0] : "",
       image: null,
-    });
+    };
+    setRewardToEdit(rewardData);
     setShowCreateNewReward(true);
-    setShowActionDropdown(null); // Close dropdown after edit
+    console.log("showCreateNewReward set to true, rewardToEdit:", rewardData);
+    setShowActionDropdown(null);
   };
 
   const handleDelete = async () => {
-    if (!selectedRow) return;
+    if (selectedRows.length === 0) return;
+    console.log("handleDelete called, selectedRows:", selectedRows);
     try {
       const token = localStorage.getItem("access_token");
-      await fetch(`${API_BASE_URL}/admin/reward/delete_reward?reward_id=${selectedRow}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await Promise.all(
+        selectedRows.map((rewardId) =>
+          fetch(`${API_BASE_URL}/admin/reward/delete_reward?reward_id=${rewardId}`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${token}` },
+          })
+        )
+      );
       await fetchRewards();
-      setSelectedRow(null);
+      setSelectedRows([]);
       setShowDeleteOverlay(false);
-      setShowActionDropdown(null); // Close dropdown after delete
+      setShowActionDropdown(null);
     } catch (error) {
-      console.error("Error deleting reward:", error);
+      console.error("Error deleting rewards:", error);
     }
   };
 
@@ -295,6 +321,12 @@ const Rewards: React.FC = () => {
   const totalPages = Math.ceil(filteredData.length / rowsPerPage);
   const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
 
+  // Debug overlay states
+  useEffect(() => {
+    console.log("Overlay state check - showCreateNewReward:", showCreateNewReward);
+    console.log("Overlay state check - showDeleteOverlay:", showDeleteOverlay);
+  }, [showCreateNewReward, showDeleteOverlay]);
+
   return (
     <div className="flex min-h-screen bg-[#19191A]">
       <NavigationPanel />
@@ -304,7 +336,7 @@ const Rewards: React.FC = () => {
           <div className="flex-1 py-4 min-w-0 max-w-[calc(100%)]">
             {loading && (
               <div className="flex justify-center items-center h-full">
-                <span className="text-orange-500 text-xs">Fetching Rewards...</span>
+                <span className="text-[#f9b54c] text-xs">Fetching Rewards...</span>
               </div>
             )}
             {error && <div className="text-red-500 text-center text-xs">Error: {error}</div>}
@@ -316,7 +348,7 @@ const Rewards: React.FC = () => {
                       <span
                         key={tab}
                         className={`text-xs cursor-pointer pb-1 ${
-                          activeTab === tab ? "text-white font-bold border-b-2 border-orange-500" : "text-gray-500"
+                          activeTab === tab ? "text-white font-bold border-b-2 border-[#f9b54c]" : "text-gray-500"
                         }`}
                         onClick={() => setActiveTab(tab as typeof activeTab)}
                       >
@@ -334,7 +366,10 @@ const Rewards: React.FC = () => {
                     </button>
                     <button
                       className="flex items-center gap-2 bg-white text-[#202022] text-xs px-3 py-2 rounded-lg"
-                      onClick={() => setShowCreateNewReward(true)}
+                      onClick={() => {
+                        console.log("New Reward clicked");
+                        setShowCreateNewReward(true);
+                      }}
                     >
                       <Image src="/create.png" alt="Create" width={12} height={12} />
                       New Reward
@@ -400,8 +435,11 @@ const Rewards: React.FC = () => {
                     </button>
                     <button
                       className="flex items-center gap-2 bg-red-600 text-white text-xs px-3 py-2 rounded-lg"
-                      onClick={() => selectedRow && setShowDeleteOverlay(true)}
-                      disabled={!selectedRow}
+                      onClick={() => {
+                        console.log("Top Delete clicked, selectedRows:", selectedRows);
+                        if (selectedRows.length > 0) setShowDeleteOverlay(true);
+                      }}
+                      disabled={selectedRows.length === 0}
                     >
                       <Image src="/delete.png" alt="Delete" width={12} height={12} />
                       Delete
@@ -428,17 +466,20 @@ const Rewards: React.FC = () => {
                   <div
                     key={reward.id}
                     className={`!grid grid-cols-[40px_2fr_1fr_1.5fr_1fr_1fr_1fr_1fr] gap-3 py-3 text-xs ${
-                      selectedRow === reward.id ? "bg-white text-black rounded-lg" : "text-white"
+                      selectedRows.includes(reward.id) ? "bg-white text-black rounded-lg" : "text-white"
                     }`}
-                    onClick={() => handleRowClick(reward.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRowClick(reward.id);
+                    }}
                   >
                     <div className="flex items-center justify-center">
                       <div
                         className={`w-4 h-4 border-2 rounded-full cursor-pointer flex items-center justify-center ${
-                          selectedRow === reward.id ? "border-black bg-black" : "border-white"
+                          selectedRows.includes(reward.id) ? "border-black bg-black" : "border-white"
                         }`}
                       >
-                        {selectedRow === reward.id && <div className="w-2 h-2 bg-white rounded-full" />}
+                        {selectedRows.includes(reward.id) && <div className="w-2 h-2 bg-white rounded-full" />}
                       </div>
                     </div>
                     <div className="truncate">{reward.title}</div>
@@ -466,32 +507,46 @@ const Rewards: React.FC = () => {
                       <Image src="/ArrowRise.png" alt="Increment" width={16} height={16} />
                     </div>
                     <div className="relative">
-                      <div
-                        className="flex items-center gap-2 cursor-pointer"
+                      <button
+                        className="flex items-center gap-2 cursor-pointer bg-transparent border-none text-xs text-white"
                         onClick={(e) => {
                           e.stopPropagation();
                           handleActionClick(index);
                         }}
                       >
-                        <span className="text-xs">Action</span>
+                        <span>Action</span>
                         <Image src="/dropdown.png" alt="Dropdown" width={16} height={16} />
-                      </div>
+                      </button>
                       {showActionDropdown === index && (
-                        <div className="absolute right-0 mt-2 w-32 bg-white rounded-lg shadow-lg z-10 text-black p-2">
-                          <div
-                            className="flex items-center gap-2 px-2 py-2 hover:bg-gray-100 cursor-pointer text-xs"
-                            onClick={() => handleEditReward(reward)}
+                        <div
+                          ref={actionDropdownRef}
+                          className="absolute right-0 mt-2 w-32 bg-white rounded-lg shadow-lg z-20 text-black p-2"
+                          onClick={(e) => e.stopPropagation()} // Prevent clicks inside dropdown from closing it
+                        >
+                          <button
+                            className="flex items-center gap-2 px-2 py-2 hover:bg-gray-100 cursor-pointer text-xs w-full text-left"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              console.log("Edit button clicked for reward:", reward.id);
+                              handleEditReward(reward);
+                            }}
                           >
                             <Image src="/edit.png" alt="Edit" width={12} height={12} />
                             Edit
-                          </div>
-                          <div
-                            className="flex items-center gap-2 px-2 py-2 hover:bg-gray-100 cursor-pointer text-xs"
-                            onClick={() => handleDelete()}
+                          </button>
+                          <button
+                            className="flex items-center gap-2 px-2 py-2 hover:bg-gray-100 cursor-pointer text-xs w-full text-left"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              console.log("Delete button clicked for reward:", reward.id);
+                              setSelectedRows([reward.id]);
+                              setShowDeleteOverlay(true);
+                              setShowActionDropdown(null);
+                            }}
                           >
                             <Image src="/deletered.png" alt="Delete" width={12} height={12} />
                             Delete
-                          </div>
+                          </button>
                         </div>
                       )}
                     </div>
@@ -532,7 +587,7 @@ const Rewards: React.FC = () => {
                           <span
                             key={num}
                             className={`px-2 py-1 rounded text-xs cursor-pointer ${
-                              currentPage === num ? "bg-orange-500 text-black" : ""
+                              currentPage === num ? "bg-[#f9b54c] text-black" : ""
                             }`}
                             onClick={() => setCurrentPage(num)}
                           >
@@ -559,11 +614,13 @@ const Rewards: React.FC = () => {
         {showCreateNewReward && (
           <CreateNewReward
             onClose={() => {
+              console.log("Closing CreateNewReward");
               setShowCreateNewReward(false);
               setRewardToEdit(null);
             }}
             rewardToEdit={rewardToEdit}
             onSubmit={async () => {
+              console.log("CreateNewReward submitted");
               await fetchRewards();
             }}
           />
@@ -574,16 +631,25 @@ const Rewards: React.FC = () => {
             <div className="bg-[#202022] rounded-lg p-6 text-white w-80 text-center">
               <Image src="/Red Delete.png" alt="Delete" width={100} height={100} className="mx-auto mb-4" />
               <h2 className="text-xl font-bold mb-4">Delete?</h2>
-              <p className="text-xs mb-6">Are you sure to delete this reward?</p>
+              <p className="text-xs mb-6">
+                Are you sure to delete {selectedRows.length} reward{selectedRows.length > 1 ? "s" : ""}?
+              </p>
               <button
                 className="w-full bg-black text-white py-2 rounded-lg hover:bg-red-600 mb-4"
-                onClick={handleDelete}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  console.log("Confirm Delete clicked");
+                  handleDelete();
+                }}
               >
                 Delete
               </button>
               <button
                 className="text-white underline bg-transparent border-none cursor-pointer text-xs"
-                onClick={() => setShowDeleteOverlay(false)}
+                onClick={() => {
+                  console.log("Cancel Delete clicked");
+                  setShowDeleteOverlay(false);
+                }}
               >
                 Back
               </button>

@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
-import { API_BASE_URL } from "@/config/api";
 
 interface TaskFormData {
   id?: string;
@@ -24,6 +23,7 @@ interface CreateTaskOverlayProps {
 
 const CreateTaskOverlay: React.FC<CreateTaskOverlayProps> = ({ onClose, taskToEdit, onSubmit }) => {
   const [formData, setFormData] = useState<TaskFormData>({
+    id: "",
     taskName: "",
     taskType: "",
     description: "",
@@ -40,8 +40,30 @@ const CreateTaskOverlay: React.FC<CreateTaskOverlayProps> = ({ onClose, taskToEd
 
   useEffect(() => {
     if (taskToEdit) {
-      console.log("Task to edit:", taskToEdit); // Debug log
-      setFormData(taskToEdit);
+      console.log("Pre-filling form with:", taskToEdit);
+      setFormData({
+        id: taskToEdit.id || "",
+        taskName: taskToEdit.taskName,
+        taskType: taskToEdit.taskType,
+        description: taskToEdit.description,
+        participants: taskToEdit.participants,
+        status: taskToEdit.status,
+        deadline: taskToEdit.deadline || null,
+        reward: taskToEdit.reward,
+        image: taskToEdit.image || null,
+      });
+    } else {
+      setFormData({
+        id: "",
+        taskName: "",
+        taskType: "",
+        description: "",
+        participants: "",
+        status: "",
+        deadline: null,
+        reward: "",
+        image: null,
+      });
     }
   }, [taskToEdit]);
 
@@ -75,13 +97,6 @@ const CreateTaskOverlay: React.FC<CreateTaskOverlayProps> = ({ onClose, taskToEd
     e.preventDefault();
     setError(null);
 
-    const token = localStorage.getItem("access_token");
-    if (!token) {
-      setError("No authentication token found. Please sign in.");
-      return;
-    }
-
-    // Validate required fields
     if (
       !formData.taskName ||
       !formData.taskType ||
@@ -94,49 +109,16 @@ const CreateTaskOverlay: React.FC<CreateTaskOverlayProps> = ({ onClose, taskToEd
       return;
     }
 
-    if (taskToEdit && !formData.id) {
-      setError("Task ID is missing for update operation.");
-      return;
-    }
+    // Ensure id is included in the submission
+    const submissionData: TaskFormData = {
+      ...formData,
+      id: taskToEdit?.id || formData.id, // Preserve id from taskToEdit
+    };
 
-    // Construct query parameters
-    const queryParams = new URLSearchParams({
-      ...(taskToEdit ? { task_id: formData.id || "" } : {}), // Use formData.id
-      task_name: formData.taskName,
-      task_type: formData.taskType,
-      task_description: formData.description,
-      task_status: formData.status,
-      task_reward: formData.reward,
-      task_deadline: formData.deadline ? formData.deadline.toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
-    }).toString();
-
-    // Construct form data for multipart fields
-    const formDataToSend = new FormData();
-    formDataToSend.append("task_participants", formData.participants);
-    if (formData.image && !taskToEdit) { // Only append image for create or if explicitly changed
-      formDataToSend.append("task_image", formData.image);
-    }
-
+    console.log("Submitting formData:", submissionData);
     try {
-      const url = `${API_BASE_URL}/admin/task/${taskToEdit ? "update_task" : "create_task"}?${queryParams}`;
-      console.log("Request URL:", url); // Debug log
-      const response = await fetch(url, {
-        method: taskToEdit ? "PUT" : "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/json",
-        },
-        body: formDataToSend,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error("Server response:", errorData);
-        throw new Error(errorData.message || `Failed to ${taskToEdit ? "update" : "create"} task (Status: ${response.status})`);
-      }
-
+      await onSubmit(submissionData);
       setShowSuccessOverlay(true);
-      await onSubmit(formData);
     } catch (err) {
       setError((err as Error).message);
       console.error("Task submission error:", err);
@@ -205,7 +187,7 @@ const CreateTaskOverlay: React.FC<CreateTaskOverlayProps> = ({ onClose, taskToEd
               className={`text-center py-1 rounded cursor-pointer text-xs ${
                 date
                   ? formData.deadline && date.toDateString() === formData.deadline.toDateString()
-                    ? "bg-orange-500 text-white"
+                    ? "bg-[#f9b54c] text-white"
                     : "hover:bg-gray-100"
                   : ""
               }`}
@@ -221,7 +203,7 @@ const CreateTaskOverlay: React.FC<CreateTaskOverlayProps> = ({ onClose, taskToEd
 
   return (
     <div className="fixed inset-0 bg-black/70 flex justify-center items-center z-50">
-      <div className="w-full max-w-lg bg-[#202022] rounded-lg p-6 text-orange-500 max-h-[90vh] overflow-y-auto">
+      <div className="w-full max-w-lg bg-[#202022] rounded-lg p-6 text-[#f9b54c] max-h-[90vh] overflow-y-auto">
         <div className="relative text-center py-3">
           <h2 className="text-xl font-bold">{taskToEdit ? "Update Task" : "Create Task"}</h2>
           <button className="absolute right-0 top-1/2 -translate-y-1/2" onClick={onClose}>
@@ -373,7 +355,7 @@ const CreateTaskOverlay: React.FC<CreateTaskOverlayProps> = ({ onClose, taskToEd
               <Image src="/upload.png" alt="Upload" width={24} height={24} className="mb-2" />
               <p className="text-xs text-gray-400">
                 Drop your image here or{" "}
-                <label className="text-orange-500 cursor-pointer">
+                <label className="text-[#f9b54c] cursor-pointer">
                   <input
                     type="file"
                     accept=".jpg,.jpeg,.png"
@@ -399,7 +381,7 @@ const CreateTaskOverlay: React.FC<CreateTaskOverlayProps> = ({ onClose, taskToEd
 
           <button
             type="submit"
-            className="w-full h-11 bg-white text-black rounded-md font-bold text-sm hover:bg-orange-500"
+            className="w-full h-11 bg-white text-black rounded-md font-bold text-sm hover:bg-[#f9b54c]"
           >
             Submit
           </button>
@@ -413,7 +395,10 @@ const CreateTaskOverlay: React.FC<CreateTaskOverlayProps> = ({ onClose, taskToEd
               <p className="text-xs mb-6">Your task is successfully {taskToEdit ? "updated" : "created"}.</p>
               <button
                 className="w-full bg-black text-white py-2 rounded-md hover:bg-green-600 mb-4"
-                onClick={onClose}
+                onClick={() => {
+                  setShowSuccessOverlay(false);
+                  onClose();
+                }}
               >
                 Proceed
               </button>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import NavigationPanel from "@/components/NavigationPanel";
@@ -52,12 +52,12 @@ const Challenges: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [rowsPerPage, setRowsPerPage] = useState(8); // Default to 8 rows
   const [currentPage, setCurrentPage] = useState(1);
   const [clans, setClans] = useState<string[]>([]);
   const [levels, setLevels] = useState<string[]>([]);
   const [filters, setFilters] = useState<Filters>({
-    participants: { "All Users": false, "Selected Users": false, "VIP Users": false },
+    participants: { "All Users": false, "Clan(s)": false, "Level(s)": false, "Specific User(s)": false },
     reward: { "1000-5000": false, "5001-10000": false, "10001+": false },
   });
   const [challengesData, setChallengesData] = useState<{
@@ -67,6 +67,20 @@ const Challenges: React.FC = () => {
     "Opened Challenges": [],
     "Completed Challenges": [],
   });
+  const actionDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Click outside detection for action dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (actionDropdownRef.current && !actionDropdownRef.current.contains(event.target as Node)) {
+        setShowActionDropdown(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   const isTokenExpired = (token: string): boolean => {
     const payload = JSON.parse(atob(token.split(".")[1]));
@@ -120,9 +134,16 @@ const Challenges: React.FC = () => {
       const ongoingData: Challenge[] = await ongoingResponse.json();
       const completedData: Challenge[] = await completedResponse.json();
 
+      const sortedOngoing = ongoingData
+        .map((challenge) => ({ ...challenge, status: "ongoing" }))
+        .sort((a, b) => new Date(b.launch_date).getTime() - new Date(a.launch_date).getTime());
+      const sortedCompleted = completedData
+        .map((challenge) => ({ ...challenge, status: "completed" }))
+        .sort((a, b) => new Date(b.launch_date).getTime() - new Date(a.launch_date).getTime());
+
       setChallengesData({
-        "Opened Challenges": ongoingData.map((challenge) => ({ ...challenge, status: "ongoing" })),
-        "Completed Challenges": completedData.map((challenge) => ({ ...challenge, status: "completed" })),
+        "Opened Challenges": sortedOngoing,
+        "Completed Challenges": sortedCompleted,
       });
     } catch (err) {
       setError((err as Error).message);
@@ -214,9 +235,11 @@ const Challenges: React.FC = () => {
     setActiveTab(tab);
     setSelectedRows([]);
     setShowActionDropdown(null);
+    setCurrentPage(1);
   };
 
   const handleDelete = async () => {
+    if (selectedRows.length === 0) return;
     try {
       const token = localStorage.getItem("access_token");
       await Promise.all(
@@ -244,6 +267,7 @@ const Challenges: React.FC = () => {
       Reward: challenge.reward,
       "Remaining Time": challenge.remaining_time,
       Participants: challenge.participants.join(", "),
+      Status: challenge.status,
     }));
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
     const workbook = XLSX.utils.book_new();
@@ -256,23 +280,30 @@ const Challenges: React.FC = () => {
   };
 
   const filteredData = challengesData[activeTab].filter((challenge) => {
-    const participantsMatch = Object.keys(filters.participants).some(
-      (p) => filters.participants[p] && challenge.participants.includes(p)
-    );
-    const rewardMatch = Object.keys(filters.reward).some((range) => {
-      if (!filters.reward[range]) return false;
-      const [min, max] = range.split("-").map((v) => (v === "10001+" ? Infinity : parseInt(v)));
-      return challenge.reward >= min && (max === Infinity || challenge.reward <= max);
-    });
+    const participantsFiltersActive = Object.values(filters.participants).some((v) => v);
+    const participantsMatch = participantsFiltersActive
+      ? (filters.participants["All Users"] && challenge.participants.includes("all_users")) ||
+        (filters.participants["Clan(s)"] && challenge.participants.includes("clan")) ||
+        (filters.participants["Level(s)"] && challenge.participants.includes("level")) ||
+        (filters.participants["Specific User(s)"] && challenge.participants.includes("specific_users"))
+      : true;
+
+    const rewardFiltersActive = Object.values(filters.reward).some((v) => v);
+    const rewardMatch = rewardFiltersActive
+      ? Object.keys(filters.reward).some((range) => {
+          if (!filters.reward[range]) return false;
+          const [min, max] = range.split("-").map((v) => (v === "10001+" ? Infinity : parseInt(v)));
+          return challenge.reward >= min && (max === Infinity || challenge.reward <= max);
+        })
+      : true;
+
     const searchMatch =
+      searchTerm === "" ||
       challenge.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       challenge.status.toLowerCase().includes(searchTerm.toLowerCase()) ||
       challenge.participants.join(", ").toLowerCase().includes(searchTerm.toLowerCase());
-    return (
-      (!Object.values(filters.participants).includes(true) || participantsMatch) &&
-      (!Object.values(filters.reward).includes(true) || rewardMatch) &&
-      (searchTerm === "" || searchMatch)
-    );
+
+    return participantsMatch && rewardMatch && searchMatch;
   });
 
   const totalPages = Math.ceil(filteredData.length / rowsPerPage);
@@ -287,7 +318,7 @@ const Challenges: React.FC = () => {
           <div className="flex-1 py-4 min-w-0 max-w-[calc(100%)]">
             {loading && (
               <div className="flex justify-center items-center h-full">
-                <span className="text-orange-500 text-xs">Fetching Challenges...</span>
+                <span className="text-[#f9b54c] text-xs">Fetching Challenges...</span>
               </div>
             )}
             {error && <div className="text-red-500 text-center text-xs">Error: {error}</div>}
@@ -299,7 +330,7 @@ const Challenges: React.FC = () => {
                       <span
                         key={tab}
                         className={`text-xs cursor-pointer pb-1 ${
-                          activeTab === tab ? "text-white font-bold border-b-2 border-orange-500" : "text-gray-500"
+                          activeTab === tab ? "text-white font-bold border-b-2 border-[#f9b54c]" : "text-gray-500"
                         }`}
                         onClick={() => handleTabChange(tab as "Opened Challenges" | "Completed Challenges")}
                       >
@@ -390,6 +421,10 @@ const Challenges: React.FC = () => {
                     )}
                   </div>
                   <div className="flex items-center gap-2">
+                    <button className="flex items-center gap-2 bg-[#19191A] text-white text-xs px-3 py-2 rounded-lg cursor-pointer">
+                      <Image src="/Date.png" alt="Date" width={12} height={12} />
+                      <span>DD-MM-YYYY</span>
+                    </button>
                     <button
                       className="flex items-center gap-2 bg-red-600 text-white text-xs px-3 py-2 rounded-lg"
                       onClick={() => selectedRows.length > 0 && setShowDeleteOverlay(true)}
@@ -422,7 +457,10 @@ const Challenges: React.FC = () => {
                     className={`grid grid-cols-[40px_2fr_1fr_1.5fr_1fr_1fr_1fr_1fr] gap-3 py-3 text-xs ${
                       selectedRows.includes(challenge.id) ? "bg-white text-black rounded-lg" : "text-white"
                     }`}
-                    onClick={() => handleRowClick(challenge.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRowClick(challenge.id);
+                    }}
                   >
                     <div className="flex items-center justify-center">
                       <div
@@ -453,27 +491,31 @@ const Challenges: React.FC = () => {
                     </div>
                     <div>{challenge.remaining_time}</div>
                     <div className="relative">
-                      <div
-                        className="flex items-center gap-2 cursor-pointer"
+                      <button
+                        className="flex items-center gap-2 cursor-pointer bg-transparent border-none text-xs text-white"
                         onClick={(e) => {
                           e.stopPropagation();
                           handleActionClick(index);
                         }}
                       >
-                        <span className="text-xs">Action</span>
+                        <span>Action</span>
                         <Image src="/dropdown.png" alt="Dropdown" width={16} height={16} />
-                      </div>
+                      </button>
                       {showActionDropdown === index && (
-                        <div className="absolute right-0 mt-2 w-32 bg-white rounded-lg shadow-lg z-10 text-black p-2">
-                          <div
-                            className="flex items-center gap-2 px-2 py-2 hover:bg-gray-100 cursor-pointer text-xs"
+                        <div
+                          ref={actionDropdownRef}
+                          className="absolute right-0 mt-2 w-32 bg-white rounded-lg shadow-lg z-20 text-black p-2"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <button
+                            className="flex items-center gap-2 px-2 py-2 hover:bg-gray-100 cursor-pointer text-xs w-full text-left"
                             onClick={() => handleEditChallenge(challenge)}
                           >
                             <Image src="/edit.png" alt="Edit" width={12} height={12} />
                             Edit
-                          </div>
-                          <div
-                            className="flex items-center gap-2 px-2 py-2 hover:bg-gray-100 cursor-pointer text-xs"
+                          </button>
+                          <button
+                            className="flex items-center gap-2 px-2 py-2 hover:bg-gray-100 cursor-pointer text-xs w-full text-left"
                             onClick={() => {
                               setSelectedRows([challenge.id]);
                               setShowDeleteOverlay(true);
@@ -482,7 +524,7 @@ const Challenges: React.FC = () => {
                           >
                             <Image src="/deletered.png" alt="Delete" width={12} height={12} />
                             Delete
-                          </div>
+                          </button>
                         </div>
                       )}
                     </div>
@@ -523,7 +565,7 @@ const Challenges: React.FC = () => {
                           <span
                             key={num}
                             className={`px-2 py-1 rounded text-xs cursor-pointer ${
-                              currentPage === num ? "bg-orange-500 text-black" : ""
+                              currentPage === num ? "bg-[#f9b54c] text-black" : ""
                             }`}
                             onClick={() => setCurrentPage(num)}
                           >
@@ -556,8 +598,8 @@ const Challenges: React.FC = () => {
               onSubmit={async (data) => {
                 await handleCreateChallengeSubmit(data);
               }}
-              clans={clans} // Pass clans as prop
-              levels={levels} // Pass levels as prop
+              clans={clans}
+              levels={levels}
             />
           )}
 
@@ -566,7 +608,9 @@ const Challenges: React.FC = () => {
               <div className="bg-[#202022] rounded-lg p-6 text-white w-80 text-center">
                 <Image src="/Red Delete.png" alt="Delete" width={100} height={100} className="mx-auto mb-4" />
                 <h2 className="text-xl font-bold mb-4">Delete?</h2>
-                <p className="text-xs mb-6">Are you sure to delete this challenge?</p>
+                <p className="text-xs mb-6">
+                  Are you sure to delete {selectedRows.length} challenge{selectedRows.length > 1 ? "s" : ""}?
+                </p>
                 <button
                   className="w-full bg-black text-white py-2 rounded-lg hover:bg-red-600 mb-4"
                   onClick={handleDelete}

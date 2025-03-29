@@ -228,7 +228,7 @@ const Dashboard: React.FC = () => {
         <div className="flex flex-1 w-full pt-24 pl-44 pr-4 lg:pl-52 lg:pr-55 md:pt-20 md:pl-6 md:pr-8 sm:pl-4 sm:pr-4 sm:pt-16">
           <div className="flex-1 py-6 min-w-0">
             <div className="mb-8">
-              <h2 className="mb-4 text-sm text-orange-400 font-semibold sm:text-xs">Overview</h2>
+              <h2 className="mb-4 text-sm text-[#f9b54c] font-semibold sm:text-xs">Overview</h2>
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
                 <div className="rounded-lg border border-white/20 bg-[#202022] p-4 h-36 flex flex-col justify-between transition-transform hover:scale-105">
                   <div className="flex items-center justify-between">
@@ -239,7 +239,7 @@ const Dashboard: React.FC = () => {
                     </span>
                   </div>
                   <div className="text-2xl font-bold sm:text-xl">{dashboardData.totalUsers.total_users}</div>
-                  <div className="text-sm text-orange-400 sm:text-xs">Total Users</div>
+                  <div className="text-sm text-[#f9b54c] sm:text-xs">Total Users</div>
                 </div>
                 <div className="rounded-lg border border-white/20 bg-[#202022] p-4 h-36 flex flex-col justify-between transition-transform hover:scale-105">
                   <div className="flex items-center justify-between">
@@ -250,7 +250,7 @@ const Dashboard: React.FC = () => {
                     </span>
                   </div>
                   <div className="text-2xl font-bold sm:text-xl">{dashboardData.newUsers.total_new_users}</div>
-                  <div className="text-sm text-orange-400 sm:text-xs">Total New Users</div>
+                  <div className="text-sm text-[#f9b54c] sm:text-xs">Total New Users</div>
                 </div>
                 <div className="rounded-lg border border-white/20 bg-[#202022] p-4 h-36 flex flex-col justify-between transition-transform hover:scale-105">
                   <div className="flex items-center justify-between">
@@ -261,7 +261,7 @@ const Dashboard: React.FC = () => {
                     </span>
                   </div>
                   <div className="text-2xl font-bold sm:text-xl">{dashboardData.totalCoinEarned.overall_total_coins}</div>
-                  <div className="text-sm text-orange-400 sm:text-xs">Total Coin Earned</div>
+                  <div className="text-sm text-[#f9b54c] sm:text-xs">Total Coin Earned</div>
                 </div>
                 <div className="rounded-lg border border-white/20 bg-[#202022] p-4 h-36 flex flex-col justify-between transition-transform hover:scale-105">
                   <div className="flex items-center justify-between">
@@ -272,19 +272,19 @@ const Dashboard: React.FC = () => {
                     </span>
                   </div>
                   <div className="text-2xl font-bold sm:text-xl">0</div>
-                  <div className="text-sm text-orange-400 sm:text-xs">Token Distributed</div>
+                  <div className="text-sm text-[#f9b54c] sm:text-xs">Token Distributed</div>
                 </div>
               </div>
             </div>
 
             <div className="mb-8 rounded-lg border border-white/20 bg-[#202022] p-6">
-              <h2 className="mb-4 text-sm text-orange-400 font-semibold sm:text-xs">Recent Activities</h2>
+              <h2 className="mb-4 text-sm text-[#f9b54c] font-semibold sm:text-xs">Recent Activities</h2>
               <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
                 <div className="flex gap-3 items-center">
                   <button
                     className={`pb-1 text-sm sm:text-xs font-semibold cursor-pointer transition-colors ${
                       activeMetric === "coin" 
-                        ? "border-b-2 border-orange-400 text-orange-400" 
+                        ? "border-b-2 border-[#f9b54c] text-[#f9b54c]" 
                         : "text-gray-500 hover:text-orange-300"
                     }`}
                     onClick={() => setActiveMetric("coin")}
@@ -295,7 +295,7 @@ const Dashboard: React.FC = () => {
                   <button
                     className={`pb-1 text-sm sm:text-xs font-semibold cursor-pointer transition-colors ${
                       activeMetric === "users" 
-                        ? "border-b-2 border-orange-400 text-orange-400" 
+                        ? "border-b-2 border-[#f9b54c] text-[#f9b54c]" 
                         : "text-gray-500 hover:text-orange-300"
                     }`}
                     onClick={() => setActiveMetric("users")}
@@ -306,7 +306,7 @@ const Dashboard: React.FC = () => {
                   <button
                     className={`pb-1 text-sm sm:text-xs font-semibold cursor-pointer transition-colors ${
                       activePeriod === "thisYear" 
-                        ? "border-b-2 border-orange-400 text-orange-400" 
+                        ? "border-b-2 border-[#f9b54c] text-[#f9b54c]" 
                         : "text-gray-500 hover:text-orange-300"
                     }`}
                     onClick={() => setActivePeriod("thisYear")}
@@ -317,7 +317,7 @@ const Dashboard: React.FC = () => {
                   <button
                     className={`pb-1 text-sm sm:text-xs font-semibold cursor-pointer transition-colors ${
                       activePeriod === "lastYear" 
-                        ? "border-b-2 border-orange-400 text-orange-400" 
+                        ? "border-b-2 border-[#f9b54c] text-[#f9b54c]" 
                         : "text-gray-500 hover:text-orange-300"
                     }`}
                     onClick={() => setActivePeriod("lastYear")}
@@ -331,11 +331,11 @@ const Dashboard: React.FC = () => {
 
             <div className="flex flex-col gap-6 sm:flex-row sm:gap-8">
               <div className="flex-1 rounded-lg border border-white/20 bg-[#202022] p-6 h-80">
-                <h2 className="mb-4 text-sm text-orange-400 font-semibold sm:text-xs">User Level</h2>
+                <h2 className="mb-4 text-sm text-[#f9b54c] font-semibold sm:text-xs">User Level</h2>
                 <div className="h-64"><canvas id="user-level-chart" /></div>
               </div>
               <div className="flex-1 rounded-lg border border-white/20 bg-[#202022] p-6 h-80">
-                <h2 className="mb-4 text-sm text-orange-400 font-semibold sm:text-xs">Wallet Connection</h2>
+                <h2 className="mb-4 text-sm text-[#f9b54c] font-semibold sm:text-xs">Wallet Connection</h2>
                 <div className="h-64 flex items-center justify-center">
                   <span className="text-sm sm:text-xs">Coming Soon</span>
                 </div>
@@ -347,8 +347,8 @@ const Dashboard: React.FC = () => {
             <div className="rounded-lg bg-[#202022] p-3 pt-4 overflow-y-auto h-full border border-white/20">
               <div className="mb-6">
                 <div className="mb-3 flex items-center justify-between">
-                  <h3 className="text-xs text-orange-400 font-semibold">New Users</h3>
-                  <div className="flex items-center gap-1 text-xs text-white cursor-pointer hover:text-orange-400" onClick={() => router.push("/users")}>
+                  <h3 className="text-xs text-[#f9b54c] font-semibold">New Users</h3>
+                  <div className="flex items-center gap-1 text-xs text-white cursor-pointer hover:text-[#f9b54c]" onClick={() => router.push("/users")}>
                     <span>See all</span>
                     <Image src="/front-arrow.png" alt="See all" width={10} height={10} />
                   </div>
@@ -366,8 +366,8 @@ const Dashboard: React.FC = () => {
               </div>
               <div>
                 <div className="mb-3 flex items-center justify-between">
-                  <h3 className="text-xs text-orange-400 font-semibold">Leaderboard</h3>
-                  <div className="flex items-center gap-1 text-xs text-white cursor-pointer hover:text-orange-400" onClick={() => router.push("/leaderboard")}>
+                  <h3 className="text-xs text-[#f9b54c] font-semibold">Leaderboard</h3>
+                  <div className="flex items-center gap-1 text-xs text-white cursor-pointer hover:text-[#f9b54c]" onClick={() => router.push("/leaderboard")}>
                     <span>See all</span>
                     <Image src="/front-arrow.png" alt="See all" width={10} height={10} />
                   </div>

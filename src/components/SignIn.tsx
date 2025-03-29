@@ -81,7 +81,7 @@ const SignIn: React.FC<SignInProps> = ({ onSignInSuccess }) => {
           <Image src="/logo.png" alt="Logo" width={60} height={60} className="sm:w-16 sm:h-16" />
           <h1 className="text-sm sm:text-base font-medium">BoredTap App</h1>
         </div>
-        <h2 className="mb-8 text-2xl text-orange-400 font-bold sm:text-3xl">Welcome Admin!</h2>
+        <h2 className="mb-8 text-2xl text-[#f9b54c] font-bold sm:text-3xl">Welcome Admin!</h2>
 
         {/* Form */}
         <form onSubmit={handleSignIn} className="w-full space-y-6">
@@ -108,7 +108,7 @@ const SignIn: React.FC<SignInProps> = ({ onSignInSuccess }) => {
           {error && <p className="text-red-500 text-sm sm:text-base">{error}</p>}
           <button
             type="submit"
-            className={`h-12 w-full rounded-lg bg-orange-400 text-sm font-semibold text-white hover:bg-orange-600 sm:h-14 sm:text-base ${
+            className={`h-12 w-full rounded-lg bg-[#f9b54c] text-sm font-semibold text-white hover:bg-[#f9b54c] sm:h-14 sm:text-base ${
               loading ? "opacity-50 cursor-not-allowed" : ""
             }`}
             disabled={loading}

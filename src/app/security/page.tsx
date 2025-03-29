@@ -111,7 +111,7 @@ const Security: React.FC = () => {
                     (formData.launchDate &&
                     date &&
                     date.toDateString() === formData.launchDate.toDateString()
-                      ? "bg-orange-500 text-white"
+                      ? "bg-[#f9b54c] text-white"
                       : "")
                   : ""
               }`}
@@ -247,7 +247,7 @@ const Security: React.FC = () => {
 
                 <button
                   type="submit"
-                  className="w-full h-12 bg-white text-black rounded-lg text-base font-bold hover:bg-orange-500 transition-colors"
+                  className="w-full h-12 bg-white text-black rounded-lg text-base font-bold hover:bg-[#f9b54c] transition-colors"
                 >
                   Submit
                 </button>

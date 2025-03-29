@@ -47,12 +47,12 @@ const NavigationPanel: React.FC = () => {
             <div
               key={index}
               className={`flex items-center px-4 py-3 w-full cursor-pointer transition-colors relative ${
-                pathname === item.path ? "text-orange-400 bg-gray-700" : "hover:bg-gray-700"
+                pathname === item.path ? "text-[#f9b54c] bg-gray-700" : "hover:bg-gray-700"
               }`}
               onClick={() => router.push(item.path)}
             >
               {pathname === item.path && (
-                <div className="absolute left-0 h-full w-1 bg-orange-400 rounded-r-md"></div>
+                <div className="absolute left-0 h-full w-1 bg-[#f9b54c] rounded-r-md"></div>
               )}
               <Image
                 src={item.icon}

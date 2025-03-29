@@ -1,7 +1,6 @@
-// src/app/tasks/page.tsx
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import NavigationPanel from "@/components/NavigationPanel";
@@ -34,7 +33,7 @@ interface TaskFormData {
 }
 
 const Tasks: React.FC = () => {
-  const [selectedRow, setSelectedRow] = useState<string | null>(null); // Changed to single selection
+  const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<"All Tasks" | "In-Game" | "Special" | "Social">("All Tasks");
   const [showActionDropdown, setShowActionDropdown] = useState<number | null>(null);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
@@ -42,7 +41,7 @@ const Tasks: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [rowsPerPage, setRowsPerPage] = useState(8);
   const [currentPage, setCurrentPage] = useState(1);
   const [tasksData, setTasksData] = useState<{
     "All Tasks": Task[];
@@ -59,13 +58,25 @@ const Tasks: React.FC = () => {
     status: { [key: string]: boolean };
     type: { [key: string]: boolean };
   }>({
-    status: { "Active": false, "Inactive": false, "Paused": false },
-    type: { "In-Game": false, "Special": false, "Social": false },
+    status: { Active: false, Inactive: false, Paused: false },
+    type: { "In-Game": false, Special: false, Social: false },
   });
   const [showCreateTaskOverlay, setShowCreateTaskOverlay] = useState(false);
   const [taskToEdit, setTaskToEdit] = useState<TaskFormData | null>(null);
+  const actionDropdownRef = useRef<HTMLDivElement>(null);
 
   const router = useRouter();
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (actionDropdownRef.current && !actionDropdownRef.current.contains(event.target as Node)) {
+        console.log("Click outside detected, closing dropdown");
+        setShowActionDropdown(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const isTokenExpired = (token: string): boolean => {
     const payload = JSON.parse(atob(token.split(".")[1]));
@@ -142,53 +153,73 @@ const Tasks: React.FC = () => {
   };
 
   const handleRowClick = (taskId: string) => {
-    setSelectedRow(taskId === selectedRow ? null : taskId); // Toggle single selection
+    setSelectedRows((prev) =>
+      prev.includes(taskId) ? prev.filter((id) => id !== taskId) : [...prev, taskId]
+    );
   };
 
   const handleActionClick = (index: number) => {
+    console.log("Action clicked, toggling dropdown for index:", index);
     setShowActionDropdown(showActionDropdown === index ? null : index);
   };
 
- // In Tasks component
-const handleEditTask = async (task: Task) => {
+  const handleEditTask = async (task: Task) => {
+    console.log("Edit button clicked for task:", task.id);
     setShowActionDropdown(null);
     try {
-      const token = localStorage.getItem("access_token");
+      let token = localStorage.getItem("access_token");
+      if (!token || isTokenExpired(token)) {
+        token = await refreshToken();
+        if (!token) return;
+      }
       const response = await fetch(`${API_BASE_URL}/admin/task/tasks_by_id?task_id=${task.id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!response.ok) throw new Error("Failed to fetch task details");
       const fullTaskDetails: Task = await response.json();
-      setTaskToEdit({
-        id: fullTaskDetails.id, // Ensure this is populated
+      const taskData: TaskFormData = {
+        id: fullTaskDetails.id,
         taskName: fullTaskDetails.task_name,
         taskType: fullTaskDetails.task_type,
         description: fullTaskDetails.task_description,
         participants: fullTaskDetails.task_participants,
         status: fullTaskDetails.task_status,
+        deadline: null, // Adjust if backend provides deadline
         reward: fullTaskDetails.task_reward,
-        deadline: null,
-        image: null,
-      });
+        image: null, // Adjust if backend provides image
+      };
+      console.log("handleEditTask - taskToEdit set to:", taskData);
+      setTaskToEdit(taskData);
       setShowCreateTaskOverlay(true);
     } catch (error) {
       console.error("Error fetching task details:", error);
+      setError("Failed to load task details for editing.");
     }
   };
 
   const handleDelete = async () => {
-    if (!selectedRow) return;
+    if (selectedRows.length === 0) return;
+    console.log("handleDelete called, selectedRows:", selectedRows);
     try {
-      const token = localStorage.getItem("access_token");
-      await fetch(`${API_BASE_URL}/admin/task/delete_task?task_id=${selectedRow}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      let token = localStorage.getItem("access_token");
+      if (!token || isTokenExpired(token)) {
+        token = await refreshToken();
+        if (!token) return;
+      }
+      await Promise.all(
+        selectedRows.map((taskId) =>
+          fetch(`${API_BASE_URL}/admin/task/delete_task?task_id=${taskId}`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${token}` },
+          })
+        )
+      );
       await fetchTasks();
-      setSelectedRow(null);
+      setSelectedRows([]);
       setShowDeleteOverlay(false);
     } catch (error) {
-      console.error("Error deleting task:", error);
+      console.error("Error deleting tasks:", error);
+      setError("Failed to delete selected tasks.");
     }
   };
 
@@ -208,23 +239,20 @@ const handleEditTask = async (task: Task) => {
   };
 
   const filteredData = tasksData[activeTab].filter((task) => {
-    // Status filter
     const statusFiltersActive = Object.values(filters.status).some((v) => v);
     const statusMatch = statusFiltersActive
-      ? (filters.status["Active"] && task.task_status === "Active") ||
-        (filters.status["Inactive"] && task.task_status === "Inactive") ||
-        (filters.status["Paused"] && task.task_status === "Paused")
+      ? (filters.status["Active"] && task.task_status === "active") ||
+        (filters.status["Inactive"] && task.task_status === "inactive") ||
+        (filters.status["Paused"] && task.task_status === "paused")
       : true;
 
-    // Type filter
     const typeFiltersActive = Object.values(filters.type).some((v) => v);
     const typeMatch = typeFiltersActive
-      ? (filters.type["In-Game"] && task.task_type === "in-game.ConcurrentModificationException") ||
+      ? (filters.type["In-Game"] && task.task_type === "in-game") ||
         (filters.type["Special"] && task.task_type === "special") ||
         (filters.type["Social"] && task.task_type === "social")
       : true;
 
-    // Search filter
     const searchMatch =
       searchTerm === "" ||
       task.task_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -237,6 +265,12 @@ const handleEditTask = async (task: Task) => {
   const totalPages = Math.ceil(filteredData.length / rowsPerPage);
   const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
 
+  useEffect(() => {
+    console.log("Overlay state check - showCreateTaskOverlay:", showCreateTaskOverlay);
+    console.log("Overlay state check - showDeleteOverlay:", showDeleteOverlay);
+    console.log("Current taskToEdit:", taskToEdit);
+  }, [showCreateTaskOverlay, showDeleteOverlay, taskToEdit]);
+
   return (
     <div className="flex min-h-screen bg-[#19191A]">
       <NavigationPanel />
@@ -246,7 +280,7 @@ const handleEditTask = async (task: Task) => {
           <div className="flex-1 py-4 min-w-0 max-w-[calc(100%)]">
             {loading && (
               <div className="flex justify-center items-center h-full">
-                <span className="text-orange-500 text-xs">Fetching Tasks...</span>
+                <span className="text-[#f9b54c] text-xs">Fetching Tasks...</span>
               </div>
             )}
             {error && <div className="text-red-500 text-center text-xs">Error: {error}</div>}
@@ -258,7 +292,7 @@ const handleEditTask = async (task: Task) => {
                       <span
                         key={tab}
                         className={`text-xs cursor-pointer pb-1 ${
-                          activeTab === tab ? "text-white font-bold border-b-2 border-orange-500" : "text-gray-500"
+                          activeTab === tab ? "text-white font-bold border-b-2 border-[#f9b54c]" : "text-gray-500"
                         }`}
                         onClick={() => setActiveTab(tab as typeof activeTab)}
                       >
@@ -276,7 +310,11 @@ const handleEditTask = async (task: Task) => {
                     </button>
                     <button
                       className="flex items-center gap-2 bg-white text-[#202022] text-xs px-3 py-2 rounded-lg"
-                      onClick={() => setShowCreateTaskOverlay(true)}
+                      onClick={() => {
+                        console.log("Create Task clicked");
+                        setTaskToEdit(null);
+                        setShowCreateTaskOverlay(true);
+                      }}
                     >
                       <Image src="/create.png" alt="Create" width={12} height={12} />
                       Create Task
@@ -284,7 +322,7 @@ const handleEditTask = async (task: Task) => {
                   </div>
                 </div>
 
-                <div className="border-t border-white/20 mb-4"></div>
+                <div className="border-t border-white/20 mb-4" />
 
                 <div className="flex justify-between items-center mb-4">
                   <div className="flex items-center bg-[#19191A] rounded-lg w-full max-w-[500px] h-[54px] p-4 relative sm:h-10">
@@ -342,8 +380,11 @@ const handleEditTask = async (task: Task) => {
                     </button>
                     <button
                       className="flex items-center gap-2 bg-red-600 text-white text-xs px-3 py-2 rounded-lg"
-                      onClick={() => selectedRow && setShowDeleteOverlay(true)}
-                      disabled={!selectedRow}
+                      onClick={() => {
+                        console.log("Top Delete clicked, selectedRows:", selectedRows);
+                        if (selectedRows.length > 0) setShowDeleteOverlay(true);
+                      }}
+                      disabled={selectedRows.length === 0}
                     >
                       <Image src="/delete.png" alt="Delete" width={12} height={12} />
                       Delete
@@ -351,7 +392,7 @@ const handleEditTask = async (task: Task) => {
                   </div>
                 </div>
 
-                <div className="border-t border-white/20 mb-4"></div>
+                <div className="border-t border-white/20 mb-4" />
 
                 <div className="grid grid-cols-[40px_2fr_1fr_2fr_1fr_1fr_1fr_1fr] gap-3 text-[#AEAAAA] text-xs font-medium mb-2">
                   <div />
@@ -364,34 +405,37 @@ const handleEditTask = async (task: Task) => {
                   <div>Action</div>
                 </div>
 
-                <div className="border-t border-white/20 mb-4"></div>
+                <div className="border-t border-white/20 mb-4" />
 
                 {filteredData.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage).map((task, index) => (
-                <div
+                  <div
                     key={task.id}
                     className={`grid grid-cols-[40px_2fr_1fr_2fr_1fr_1fr_1fr_1fr] gap-3 py-3 text-xs ${
-                    selectedRow === task.id ? "bg-white text-black rounded-lg" : "text-white"
+                      selectedRows.includes(task.id) ? "bg-white text-black rounded-lg" : "text-white"
                     }`}
-                    onClick={() => handleRowClick(task.id)}
-                >
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRowClick(task.id);
+                    }}
+                  >
                     <div className="flex items-center justify-center">
-                    <div
+                      <div
                         className={`w-4 h-4 border-2 rounded-full cursor-pointer flex items-center justify-center ${
-                        selectedRow === task.id ? "border-black bg-black" : "border-white"
+                          selectedRows.includes(task.id) ? "border-black bg-black" : "border-white"
                         }`}
-                    >
-                        {selectedRow === task.id && <div className="w-2 h-2 bg-white rounded-full" />}
-                    </div>
+                      >
+                        {selectedRows.includes(task.id) && <div className="w-2 h-2 bg-white rounded-full" />}
+                      </div>
                     </div>
                     <div className="truncate">{task.task_name}</div>
                     <div>{task.task_type}</div>
                     <div className="truncate">{task.task_description}</div>
                     <div>
-                    <span
+                      <span
                         className={`px-2 py-1 rounded text-xs ${
-                          task.task_status.toLowerCase() === "active" || task.task_status === "on_going"
+                          task.task_status.toLowerCase() === "active"
                             ? "bg-[#E7F7EF] text-[#0CAF60]"
-                            : task.task_status.toLowerCase() === "inactive" || task.task_status === "claimed"
+                            : task.task_status.toLowerCase() === "inactive"
                             ? "bg-[#D8CBFD] text-[#551DEC]"
                             : task.task_status.toLowerCase() === "paused"
                             ? "bg-[#19191A] text-[#D3D1D1]"
@@ -399,51 +443,61 @@ const handleEditTask = async (task: Task) => {
                         }`}
                       >
                         {task.task_status}
-                    </span>
+                      </span>
                     </div>
                     <div className="flex items-center gap-2">
-                    <Image src="/logo.png" alt="Reward" width={16} height={16} />
-                    {task.task_reward}
+                      <Image src="/logo.png" alt="Reward" width={16} height={16} />
+                      {task.task_reward}
                     </div>
                     <div>{task.task_participants}</div>
                     <div className="relative">
-                    <div
-                        className="flex items-center gap-2 cursor-pointer"
+                      <button
+                        className="flex items-center gap-2 cursor-pointer bg-transparent border-none text-xs text-white"
                         onClick={(e) => {
-                        e.stopPropagation();
-                        handleActionClick(index);
+                          e.stopPropagation();
+                          handleActionClick(index);
                         }}
-                    >
-                        <span className="text-xs">Action</span>
+                      >
+                        <span>Action</span>
                         <Image src="/dropdown.png" alt="Dropdown" width={16} height={16} />
-                    </div>
-                    {showActionDropdown === index && (
-                        <div className="absolute right-0 mt-2 w-32 bg-white rounded-lg shadow-lg z-10 text-black p-2">
+                      </button>
+                      {showActionDropdown === index && (
                         <div
-                            className="flex items-center gap-2 px-2 py-2 hover:bg-gray-100 cursor-pointer text-xs"
-                            onClick={() => handleEditTask(task)}
+                          ref={actionDropdownRef}
+                          className="absolute right-0 mt-2 w-32 bg-white rounded-lg shadow-lg z-20 text-black p-2"
+                          onClick={(e) => e.stopPropagation()}
                         >
+                          <button
+                            className="flex items-center gap-2 px-2 py-2 hover:bg-gray-100 cursor-pointer text-xs w-full text-left"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditTask(task);
+                            }}
+                          >
                             <Image src="/edit.png" alt="Edit" width={12} height={12} />
                             Edit
-                        </div>
-                        <div
-                            className="flex items-center gap-2 px-2 py-2 hover:bg-gray-100 cursor-pointer text-xs"
-                            onClick={() => {
-                            setSelectedRow(task.id);
-                            setShowDeleteOverlay(true);
+                          </button>
+                          <button
+                            className="flex items-center gap-2 px-2 py-2 hover:bg-gray-100 cursor-pointer text-xs w-full text-left"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              console.log("Delete button clicked for task:", task.id);
+                              setSelectedRows([task.id]);
+                              setShowDeleteOverlay(true);
+                              setShowActionDropdown(null);
                             }}
-                        >
+                          >
                             <Image src="/deletered.png" alt="Delete" width={12} height={12} />
                             Delete
+                          </button>
                         </div>
-                        </div>
-                    )}
+                      )}
                     </div>
-                </div>
+                  </div>
                 ))}
 
                 <div className="relative mt-6">
-                  <div className="border-t border-white/20"></div>
+                  <div className="border-t border-white/20" />
                   <div className="flex flex-col sm:flex-row justify-between items-center mt-4 text-white">
                     <div className="flex items-center gap-2 mb-2 sm:mb-0">
                       <span className="text-xs">Show Result:</span>
@@ -476,7 +530,7 @@ const handleEditTask = async (task: Task) => {
                           <span
                             key={num}
                             className={`px-2 py-1 rounded text-xs cursor-pointer ${
-                              currentPage === num ? "bg-orange-500 text-black" : ""
+                              currentPage === num ? "bg-[#f9b54c] text-black" : ""
                             }`}
                             onClick={() => setCurrentPage(num)}
                           >
@@ -503,26 +557,66 @@ const handleEditTask = async (task: Task) => {
         {showCreateTaskOverlay && (
           <CreateTaskOverlay
             onClose={() => {
+              console.log("Closing CreateTaskOverlay");
               setShowCreateTaskOverlay(false);
               setTaskToEdit(null);
             }}
             taskToEdit={taskToEdit}
             onSubmit={async (taskData) => {
-              const token = localStorage.getItem("access_token");
+              console.log("CreateTaskOverlay submitted with data:", taskData);
+              let token = localStorage.getItem("access_token");
+              if (!token || isTokenExpired(token)) {
+                token = await refreshToken();
+                if (!token) throw new Error("Token refresh failed");
+              }
+
+              // Log taskToEdit and taskData.id for clarity
+              console.log("taskToEdit at submission:", taskToEdit);
+              console.log("taskData.id at submission:", taskData.id);
+
+              if (!taskData.id && taskToEdit) {
+                throw new Error("Task ID is missing for update operation");
+              }
+
+              const queryParams = new URLSearchParams({
+                ...(taskData.id ? { task_id: taskData.id } : {}),
+                task_name: taskData.taskName,
+                task_type: taskData.taskType,
+                task_description: taskData.description,
+                task_status: taskData.status,
+                task_reward: taskData.reward,
+                task_deadline: taskData.deadline
+                  ? taskData.deadline.toISOString().split("T")[0]
+                  : new Date().toISOString().split("T")[0],
+              }).toString();
+
               const formData = new FormData();
-              Object.entries(taskData).forEach(([key, value]) => {
-                if (value !== null && value !== undefined) {
-                  formData.append(
-                    key === "taskName" ? "task_name" : key,
-                    value instanceof Date ? value.toISOString().split("T")[0] : value
-                  );
-                }
-              });
-              await fetch(`${API_BASE_URL}/admin/task/${taskData.id ? "update_task" : "create_task"}`, {
-                method: taskData.id ? "PUT" : "POST",
+              formData.append("task_participants", taskData.participants);
+              if (taskData.image) {
+                formData.append("task_image", taskData.image);
+              }
+
+              const endpoint = taskData.id ? "update_task" : "create_task";
+              const method = taskData.id ? "PUT" : "POST";
+
+              console.log(`Submitting to ${endpoint} with method ${method}, query:`, queryParams);
+              console.log("FormData participants:", taskData.participants, "image:", taskData.image?.name);
+
+              const response = await fetch(`${API_BASE_URL}/admin/task/${endpoint}?${queryParams}`, {
+                method,
                 headers: { Authorization: `Bearer ${token}` },
                 body: formData,
               });
+
+              if (!response.ok) {
+                const errorData = await response.json();
+                console.error("API error response:", errorData);
+                throw new Error(errorData.message || `Failed to ${taskData.id ? "update" : "create"} task`);
+              }
+
+              const responseData = await response.json();
+              console.log("API response:", responseData);
+
               await fetchTasks();
             }}
           />
@@ -533,16 +627,25 @@ const handleEditTask = async (task: Task) => {
             <div className="bg-[#202022] rounded-lg p-6 text-white w-80 text-center">
               <Image src="/Red Delete.png" alt="Delete" width={100} height={100} className="mx-auto mb-4" />
               <h2 className="text-xl font-bold mb-4">Delete?</h2>
-              <p className="text-xs mb-6">Are you sure to delete this task?</p>
+              <p className="text-xs mb-6">
+                Are you sure to delete {selectedRows.length} task{selectedRows.length > 1 ? "s" : ""}?
+              </p>
               <button
                 className="w-full bg-black text-white py-2 rounded-lg hover:bg-red-600 mb-4"
-                onClick={handleDelete}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  console.log("Confirm Delete clicked");
+                  handleDelete();
+                }}
               >
                 Delete
               </button>
               <button
                 className="text-white underline bg-transparent border-none cursor-pointer text-xs"
-                onClick={() => setShowDeleteOverlay(false)}
+                onClick={() => {
+                  console.log("Cancel Delete clicked");
+                  setShowDeleteOverlay(false);
+                }}
               >
                 Back
               </button>

@@ -149,7 +149,7 @@ const CreateBoosterOverlay: React.FC<CreateBoosterOverlayProps> = ({ onClose, bo
 
   return (
     <div className="fixed inset-0 bg-black/70 flex justify-center items-center z-50">
-      <div className="w-full max-w-lg bg-[#202022] rounded-lg p-6 text-orange-500 max-h-[90vh] overflow-y-auto">
+      <div className="w-full max-w-lg bg-[#202022] rounded-lg p-6 text-[#f9b54c] max-h-[90vh] overflow-y-auto">
         <div className="relative text-center py-3">
           <h2 className="text-xl font-bold">{boostToEdit ? "Update Booster" : "Create Booster"}</h2>
           <button className="absolute right-0 top-1/2 -translate-y-1/2" onClick={onClose}>
@@ -270,7 +270,7 @@ const CreateBoosterOverlay: React.FC<CreateBoosterOverlayProps> = ({ onClose, bo
               <Image src="/upload.png" alt="Upload" width={24} height={24} className="mb-2" />
               <p className="text-xs text-gray-400">
                 Drop your image here or{" "}
-                <label className="text-orange-500 cursor-pointer">
+                <label className="text-[#f9b54c] cursor-pointer">
                   <input
                     type="file"
                     accept=".jpg,.jpeg,.png"
@@ -296,7 +296,7 @@ const CreateBoosterOverlay: React.FC<CreateBoosterOverlayProps> = ({ onClose, bo
 
           <button
             type="submit"
-            className="w-full h-11 bg-white text-black rounded-md font-bold text-sm hover:bg-orange-500"
+            className="w-full h-11 bg-white text-black rounded-md font-bold text-sm hover:bg-[#f9b54c]"
           >
             Submit
           </button>

@@ -187,7 +187,7 @@ const ProfileOverlay: React.FC<ProfileOverlayProps> = ({ onClose, user, onStatus
                 date
                   ? "hover:bg-gray-100 " +
                     (suspendEndDate && date && date.toDateString() === suspendEndDate.toDateString()
-                      ? "bg-orange-500 text-white"
+                      ? "bg-[#f9b54c] text-white"
                       : "")
                   : ""
               }`}
@@ -212,7 +212,7 @@ const ProfileOverlay: React.FC<ProfileOverlayProps> = ({ onClose, user, onStatus
     <div className="fixed inset-0 bg-black/70 flex justify-center items-center z-50" onClick={onClose}>
       <div className="bg-[#202022] rounded-lg p-6 text-white w-[600px] max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="relative text-center py-5">
-          <h1 className="text-xl font-bold text-orange-500">User Profile</h1>
+          <h1 className="text-xl font-bold text-[#f9b54c]">User Profile</h1>
           <button className="absolute right-0 top-1/2 -translate-y-1/2" onClick={onClose}>
             <Image src="/cancel.png" alt="Close" width={24} height={24} />
           </button>
@@ -221,7 +221,7 @@ const ProfileOverlay: React.FC<ProfileOverlayProps> = ({ onClose, user, onStatus
         <div className="flex flex-col items-center mb-6">
           <Image src={displayData.image_url || "/profile-picture.png"} alt="Profile" width={80} height={80} className="rounded-full mb-2" />
           <h2 className="text-lg font-bold">{displayData.username}</h2>
-          <p className="text-xs text-orange-500">Level: {displayData.level || "-"} - {displayData.level_name}</p>
+          <p className="text-xs text-[#f9b54c]">Level: {displayData.level || "-"} - {displayData.level_name}</p>
           <span
             className={`mt-2 px-2 py-1 rounded text-xs ${
               isActive ? "bg-[#E7F7EF] text-[#0CAF60]" : isSuspended ? "bg-[#FFD8D8] text-[#FF0000]" : isDisband ? "bg-[#D8CBFD] text-[#551DEC]" : "bg-gray-500 text-white"
@@ -232,7 +232,7 @@ const ProfileOverlay: React.FC<ProfileOverlayProps> = ({ onClose, user, onStatus
         </div>
 
         <div className="mb-6">
-          <h3 className="text-orange-500 text-sm font-bold mb-2">Overall Achievement</h3>
+          <h3 className="text-[#f9b54c] text-sm font-bold mb-2">Overall Achievement</h3>
           <hr className="border-[#363638] mb-4" />
           <div className="flex justify-between text-sm">
             <div className="flex flex-col">
@@ -260,7 +260,7 @@ const ProfileOverlay: React.FC<ProfileOverlayProps> = ({ onClose, user, onStatus
 
         <hr className="border-[#363638] my-4" />
         <div className="mb-6">
-          <h3 className="text-orange-500 text-sm font-bold mb-2">Today Achievement</h3>
+          <h3 className="text-[#f9b54c] text-sm font-bold mb-2">Today Achievement</h3>
           <hr className="border-[#363638] mb-4" />
           <div className="flex justify-between text-sm">
             <div className="flex flex-col">
@@ -288,7 +288,7 @@ const ProfileOverlay: React.FC<ProfileOverlayProps> = ({ onClose, user, onStatus
 
         <hr className="border-[#363638] my-4" />
         <div className="mb-6">
-          <h3 className="text-orange-500 text-sm font-bold mb-2">Wallet Address</h3>
+          <h3 className="text-[#f9b54c] text-sm font-bold mb-2">Wallet Address</h3>
           <hr className="border-[#363638] mb-4" />
           <div className="flex justify-between items-center text-sm">
             {displayData.wallet_address ? (
@@ -307,7 +307,7 @@ const ProfileOverlay: React.FC<ProfileOverlayProps> = ({ onClose, user, onStatus
 
         <hr className="border-[#363638] my-4" />
         <div className="mb-6">
-          <h3 className="text-orange-500 text-sm font-bold mb-2">Clan</h3>
+          <h3 className="text-[#f9b54c] text-sm font-bold mb-2">Clan</h3>
           <hr className="border-[#363638] mb-4" />
           <div className="flex justify-between text-sm">
             <div className="flex flex-col">
@@ -323,7 +323,7 @@ const ProfileOverlay: React.FC<ProfileOverlayProps> = ({ onClose, user, onStatus
 
         <hr className="border-[#363638] my-4" />
         <div className="mb-6">
-          <h3 className="text-orange-500 text-sm font-bold mb-2">Registration</h3>
+          <h3 className="text-[#f9b54c] text-sm font-bold mb-2">Registration</h3>
           <hr className="border-[#363638] mb-4" />
           <div className="flex justify-between text-sm">
             <div className="flex flex-col">

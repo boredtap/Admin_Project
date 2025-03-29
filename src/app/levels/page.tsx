@@ -284,7 +284,7 @@ const Levels: React.FC = () => {
                   <span
                     className={`text-xs cursor-pointer pb-1 ${
                       activeTab === "Levels"
-                        ? "text-white font-bold border-b-2 border-orange-500"
+                        ? "text-white font-bold border-b-2 border-[#f9b54c]"
                         : "text-gray-500"
                     }`}
                     onClick={() => setActiveTab("Levels")}
@@ -346,7 +346,7 @@ const Levels: React.FC = () => {
                         ))}
                       </div>
                       <button
-                        className="text-xs text-orange-500 underline"
+                        className="text-xs text-[#f9b54c] underline"
                         onClick={clearFilters}
                       >
                         Clear selection
@@ -504,7 +504,7 @@ const Levels: React.FC = () => {
                         <span
                           key={num}
                           className={`px-2 py-1 rounded text-xs cursor-pointer ${
-                            currentPage === num ? "bg-orange-500 text-black" : ""
+                            currentPage === num ? "bg-[#f9b54c] text-black" : ""
                           }`}
                           onClick={() => setCurrentPage(num)}
                         >

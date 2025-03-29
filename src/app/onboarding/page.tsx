@@ -34,7 +34,7 @@ const Onboarding = () => {
           <Image src="/logo.png" alt="Logo" width={300} height={300} className="sm:w-80 sm:h-80" />
           <h1 className="mt-8 text-4xl text-white font-bold sm:text-3xl">BoredTap App</h1>
           <div className="mt-6 h-4 w-full max-w-md overflow-hidden rounded-full bg-gray-200">
-            <div className="h-full w-0 animate-[load_2s_linear_infinite] bg-orange-400" />
+            <div className="h-full w-0 animate-[load_2s_linear_infinite] bg-[#f9b54c]" />
           </div>
         </div>
       )}
