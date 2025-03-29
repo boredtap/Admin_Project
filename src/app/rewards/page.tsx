@@ -65,6 +65,9 @@ const Rewards: React.FC = () => {
   const [clans, setClans] = useState<string[]>([]);
   const [levels, setLevels] = useState<string[]>([]);
   const actionDropdownRef = useRef<HTMLDivElement>(null);
+  const filterDropdownRef = useRef<HTMLDivElement>(null);
+
+  
 
   const router = useRouter();
 
@@ -81,6 +84,19 @@ const Rewards: React.FC = () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
+
+  useEffect(() => {
+    const handleClickOutsideFilter = (event: MouseEvent) => {
+      if (filterDropdownRef.current && !filterDropdownRef.current.contains(event.target as Node)) {
+        setShowFilterDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutsideFilter);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutsideFilter);
+    };
+  }, []);
+  
 
   const isTokenExpired = (token: string): boolean => {
     const payload = JSON.parse(atob(token.split(".")[1]));
@@ -398,7 +414,10 @@ const Rewards: React.FC = () => {
                       onClick={() => setShowFilterDropdown(!showFilterDropdown)}
                     />
                     {showFilterDropdown && (
-                      <div className="absolute top-full right-0 mt-2 w-52 bg-white rounded-lg p-4 shadow-lg z-10 text-black">
+                      <div
+                      ref={filterDropdownRef}
+                      className="absolute top-full right-0 mt-2 w-52 bg-white rounded-lg p-4 shadow-lg z-10 text-black"
+                    >
                         <div className="mb-4">
                           <h4 className="text-xs font-bold mb-2">Status</h4>
                           {Object.keys(filters.status).map((status) => (

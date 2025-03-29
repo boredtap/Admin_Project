@@ -68,6 +68,8 @@ const Challenges: React.FC = () => {
     "Completed Challenges": [],
   });
   const actionDropdownRef = useRef<HTMLDivElement>(null);
+  const filterDropdownRef = useRef<HTMLDivElement>(null);
+
 
   // Click outside detection for action dropdown
   useEffect(() => {
@@ -81,6 +83,19 @@ const Challenges: React.FC = () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
+
+  useEffect(() => {
+    const handleClickOutsideFilter = (event: MouseEvent) => {
+      if (filterDropdownRef.current && !filterDropdownRef.current.contains(event.target as Node)) {
+        setShowFilterDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutsideFilter);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutsideFilter);
+    };
+  }, []);
+  
 
   const isTokenExpired = (token: string): boolean => {
     const payload = JSON.parse(atob(token.split(".")[1]));
@@ -380,7 +395,10 @@ const Challenges: React.FC = () => {
                       onClick={() => setShowFilterDropdown(!showFilterDropdown)}
                     />
                     {showFilterDropdown && (
-                      <div className="absolute top-full right-0 mt-2 w-52 bg-white rounded-lg p-4 shadow-lg z-10 text-black">
+                      <div
+                      ref={filterDropdownRef}
+                      className="absolute top-full right-0 mt-2 w-52 bg-white rounded-lg p-4 shadow-lg z-10 text-black"
+                    >
                         <div className="mb-4">
                           <h4 className="text-xs font-bold mb-2">Participants</h4>
                           {Object.keys(filters.participants).map((participant) => (

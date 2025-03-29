@@ -1,8 +1,6 @@
-// src/app/leaderboard/page.tsx
-
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import NavigationPanel from "@/components/NavigationPanel";
 import AppBar from "@/components/AppBar";
@@ -28,11 +26,13 @@ interface Filters {
 
 const Leaderboard: React.FC = () => {
   const [showOverlay, setShowOverlay] = useState(false);
+  const actionDropdownRef = useRef<HTMLDivElement>(null); // Ref for Action dropdown
+  const filterDropdownRef = useRef<HTMLDivElement>(null); // Ref for Filter dropdown
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"All Time" | "Daily" | "Weekly" | "Monthly">("All Time");
   const [showActionDropdown, setShowActionDropdown] = useState<number | null>(null);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
-  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [rowsPerPage, setRowsPerPage] = useState(8); // Already set to 8
   const [currentPage, setCurrentPage] = useState(1);
   const [leaderboardData, setLeaderboardData] = useState<{
     "All Time": User[];
@@ -59,6 +59,32 @@ const Leaderboard: React.FC = () => {
       Legend: false,
     },
   });
+
+  // Action dropdown outside click handler
+  useEffect(() => {
+    const handleClickOutsideAction = (event: MouseEvent) => {
+      if (actionDropdownRef.current && !actionDropdownRef.current.contains(event.target as Node)) {
+        setShowActionDropdown(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutsideAction);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutsideAction);
+    };
+  }, []);
+
+  // Filter dropdown outside click handler
+  useEffect(() => {
+    const handleClickOutsideFilter = (event: MouseEvent) => {
+      if (filterDropdownRef.current && !filterDropdownRef.current.contains(event.target as Node)) {
+        setShowFilterDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutsideFilter);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutsideFilter);
+    };
+  }, []);
 
   useEffect(() => {
     fetchLeaderboardData(activeTab);
@@ -135,6 +161,7 @@ const Leaderboard: React.FC = () => {
       (user) => user.telegram_user_id !== telegramUserId
     );
     setLeaderboardData((prev) => ({ ...prev, [activeTab]: updatedData }));
+    setShowActionDropdown(null); // Close dropdown after action
   };
 
   const handleExport = () => {
@@ -216,7 +243,10 @@ const Leaderboard: React.FC = () => {
                     onClick={() => setShowFilterDropdown(!showFilterDropdown)}
                   />
                   {showFilterDropdown && (
-                    <div className="absolute top-full right-0 mt-2 w-52 bg-white rounded-lg p-4 shadow-lg z-10 text-black">
+                    <div
+                      ref={filterDropdownRef} // Added ref for Filter dropdown
+                      className="absolute top-full right-0 mt-2 w-52 bg-white rounded-lg p-4 shadow-lg z-10 text-black"
+                    >
                       <div className="mb-4">
                         <h4 className="text-xs font-bold mb-2">Level</h4>
                         {Object.keys(filters.level).map((level) => (
@@ -256,57 +286,65 @@ const Leaderboard: React.FC = () => {
 
               <div className="border-t border-white/20 mb-4"></div>
 
-              {filteredData
-                .slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage)
-                .map((user, index) => (
-                  <div
-                    key={user.telegram_user_id || index}
-                    className={`grid grid-cols-[40px_1fr_1fr_1fr_1fr_1fr_1fr_1fr] gap-3 py-3 text-xs ${
-                      selectedUserId === user.telegram_user_id ? "bg-white text-black rounded-lg" : "text-white"
-                    }`}
-                    onClick={() => handleRowClick(user.telegram_user_id || "")}
-                  >
-                    <div className="flex items-center justify-center">
-                      <div
-                        className={`w-4 h-4 border-2 rounded-full cursor-pointer ${
-                          selectedUserId === user.telegram_user_id ? "bg-black border-black" : "border-white"
-                        }`}
-                      />
-                    </div>
-                    <div>{user.rank}</div>
-                    <div>{user.username}</div>
-                    <div>{user.level_name}</div>
-                    <div className="flex items-center gap-2">
-                      <Image src="/logo.png" alt="Coin" width={16} height={16} />
-                      {user.coins_earned}
-                    </div>
-                    <div>{user.clan?.clan_name || (typeof user.clan === 'string' ? user.clan : '-')}</div>
-                    <div>{user.longest_streak}</div>
-                    <div className="relative">
-                      <div
-                        className="flex items-center gap-2 cursor-pointer"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleActionClick(index);
-                        }}
-                      >
-                        <span className="text-xs">Action</span>
-                        <Image src="/dropdown.png" alt="Dropdown" width={16} height={16} />
+              {filteredData.length === 0 ? (
+                <div className="text-white text-xs">No users to display</div>
+              ) : (
+                filteredData
+                  .slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage)
+                  .map((user, index) => (
+                    <div
+                      key={user.telegram_user_id || index}
+                      className={`grid grid-cols-[40px_1fr_1fr_1fr_1fr_1fr_1fr_1fr] gap-3 py-3 text-xs ${
+                        selectedUserId === user.telegram_user_id ? "bg-white text-black rounded-lg" : "text-white"
+                      }`}
+                      onClick={() => handleRowClick(user.telegram_user_id || "")}
+                    >
+                      <div className="flex items-center justify-center">
+                        <div
+                          className={`w-4 h-4 border-2 rounded-full cursor-pointer ${
+                            selectedUserId === user.telegram_user_id ? "bg-black border-black" : "border-white"
+                          }`}
+                        />
                       </div>
-                      {showActionDropdown === index && (
-                        <div className="absolute right-0 mt-2 w-32 bg-white rounded-lg shadow-lg z-10 text-black p-2">
-                          <div
-                            className="flex items-center gap-2 px-2 py-2 hover:bg-gray-100 cursor-pointer text-xs"
-                            onClick={() => handleDelete(user.telegram_user_id || "")}
-                          >
-                            <Image src="/deletered.png" alt="Delete" width={12} height={12} />
-                            Delete
-                          </div>
+                      <div>{user.rank}</div>
+                      <div>{user.username}</div>
+                      <div>{user.level_name}</div>
+                      <div className="flex items-center gap-2">
+                        <Image src="/logo.png" alt="Coin" width={16} height={16} />
+                        {user.coins_earned}
+                      </div>
+                      <div>{user.clan?.clan_name || (typeof user.clan === "string" ? user.clan : "-")}</div>
+                      <div>{user.longest_streak}</div>
+                      <div className="relative">
+                        <div
+                          className="flex items-center gap-2 cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleActionClick(index);
+                          }}
+                        >
+                          <span className="text-xs">Action</span>
+                          <Image src="/dropdown.png" alt="Dropdown" width={16} height={16} />
                         </div>
-                      )}
+                        {showActionDropdown === index && (
+                          <div
+                            ref={actionDropdownRef} // Ref already present, kept as is
+                            className="absolute right-0 mt-2 w-32 bg-white rounded-lg shadow-lg z-10 text-black p-2"
+                            onClick={(e) => e.stopPropagation()} // Prevent row click from triggering
+                          >
+                            <div
+                              className="flex items-center gap-2 px-2 py-2 hover:bg-gray-100 cursor-pointer text-xs"
+                              onClick={() => handleDelete(user.telegram_user_id || "")}
+                            >
+                              <Image src="/deletered.png" alt="Delete" width={12} height={12} />
+                              Delete
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+              )}
 
               <div className="relative mt-6">
                 <div className="border-t border-white/20"></div>

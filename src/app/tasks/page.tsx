@@ -61,6 +61,7 @@ const Tasks: React.FC = () => {
     status: { Active: false, Inactive: false, Paused: false },
     type: { "In-Game": false, Special: false, Social: false },
   });
+  
   const [showCreateTaskOverlay, setShowCreateTaskOverlay] = useState(false);
   const [taskToEdit, setTaskToEdit] = useState<TaskFormData | null>(null);
   const actionDropdownRef = useRef<HTMLDivElement>(null);

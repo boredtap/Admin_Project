@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef} from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import NavigationPanel from "@/components/NavigationPanel";
@@ -37,37 +37,39 @@ type LevelFilterKey =
   | "Conqueror"
   | "Legend";
 
-const Levels: React.FC = () => {
-  const [selectedRows, setSelectedRows] = useState<string[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"Levels">("Levels");
-  const [showActionDropdown, setShowActionDropdown] = useState<number | null>(null);
-  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
-  const [rowsPerPage, setRowsPerPage] = useState(5);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [showDeleteOverlay, setShowDeleteOverlay] = useState(false);
-  const [levelToDelete, setLevelToDelete] = useState<string | null>(null);
-  const [showCreateOverlay, setShowCreateOverlay] = useState(false);
-  const [levelToEdit, setLevelToEdit] = useState<LevelFormData | null>(null);
-  const [levelsData, setLevelsData] = useState<{ Levels: Level[] }>({ Levels: [] });
-  const [filters, setFilters] = useState<{ level: Record<LevelFilterKey, boolean> }>({
-    level: {
-      Novice: false,
-      Explorer: false,
-      Apprentice: false,
-      Warrior: false,
-      Master: false,
-      Champion: false,
-      Tactician: false,
-      Specialist: false,
-      Conqueror: false,
-      Legend: false,
-    },
-  });
-
-  const router = useRouter();
-
-  const isTokenExpired = (token: string): boolean => {
+  const Levels: React.FC = () => {
+    const [selectedRows, setSelectedRows] = useState<string[]>([]);
+    const [error, setError] = useState<string | null>(null);
+    const [activeTab, setActiveTab] = useState<"Levels">("Levels");
+    const [showActionDropdown, setShowActionDropdown] = useState<number | null>(null);
+    const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+    const [rowsPerPage, setRowsPerPage] = useState(8); // Changed from 5 to 8
+    const [currentPage, setCurrentPage] = useState(1);
+    // const [showDeleteOverlay, setShowDeleteOverlay] = useState(false);
+    // const [levelToDelete, setLevelToDelete] = useState<string | null>(null);
+    const [showCreateOverlay, setShowCreateOverlay] = useState(false);
+    const [levelToEdit, setLevelToEdit] = useState<LevelFormData | null>(null);
+    const [levelsData, setLevelsData] = useState<{ Levels: Level[] }>({ Levels: [] });
+    const [filters, setFilters] = useState<{ level: Record<LevelFilterKey, boolean> }>({
+      level: {
+        Novice: false,
+        Explorer: false,
+        Apprentice: false,
+        Warrior: false,
+        Master: false,
+        Champion: false,
+        Tactician: false,
+        Specialist: false,
+        Conqueror: false,
+        Legend: false,
+      },
+    });
+  
+    const router = useRouter();
+    const actionDropdownRef = useRef<HTMLDivElement>(null); // Ref for action dropdown
+    const filterDropdownRef = useRef<HTMLDivElement>(null); // Ref for filter dropdown
+    
+    const isTokenExpired = (token: string): boolean => {
     const payload = JSON.parse(atob(token.split(".")[1]));
     return payload.exp * 1000 < Date.now();
   };
@@ -166,6 +168,30 @@ const Levels: React.FC = () => {
     fetchLevels();
   }, [fetchLevels]);
 
+  useEffect(() => {
+    const handleClickOutsideAction = (event: MouseEvent) => {
+      if (actionDropdownRef.current && !actionDropdownRef.current.contains(event.target as Node)) {
+        setShowActionDropdown(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutsideAction);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutsideAction);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutsideFilter = (event: MouseEvent) => {
+      if (filterDropdownRef.current && !filterDropdownRef.current.contains(event.target as Node)) {
+        setShowFilterDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutsideFilter);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutsideFilter);
+    };
+  }, []);
+
   const decodeLevelName = (encodedName: string): string => {
     try {
       return decodeURIComponent(encodedName);
@@ -209,42 +235,42 @@ const Levels: React.FC = () => {
     setShowActionDropdown(showActionDropdown === index ? null : index);
   };
 
-  const handleDelete = (levelId: string) => {
-    setLevelToDelete(levelId);
-    setShowDeleteOverlay(true);
-    setShowActionDropdown(null); // Close dropdown when delete is clicked
-  };
+  // const handleDelete = (levelId: string) => {
+  //   setLevelToDelete(levelId);
+  //   setShowDeleteOverlay(true);
+  //   setShowActionDropdown(null); // Close dropdown when delete is clicked
+  // };
 
-  const handleDeleteConfirmed = async () => {
-    if (!levelToDelete) return;
+  // const handleDeleteConfirmed = async () => {
+  //   if (!levelToDelete) return;
 
-    try {
-      const token = localStorage.getItem("access_token");
-      if (!token) throw new Error("No access token found");
+  //   try {
+  //     const token = localStorage.getItem("access_token");
+  //     if (!token) throw new Error("No access token found");
 
-      const response = await fetch(`${API_BASE_URL}/admin/levels/delete_level/${levelToDelete}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/json",
-        },
-      });
+  //     const response = await fetch(`${API_BASE_URL}/admin/levels/delete_level/${levelToDelete}`, {
+  //       method: "DELETE",
+  //       headers: {
+  //         Authorization: `Bearer ${token}`,
+  //         Accept: "application/json",
+  //       },
+  //     });
 
-      if (!response.ok) throw new Error("Failed to delete level");
+  //     if (!response.ok) throw new Error("Failed to delete level");
 
-      setLevelsData((prev) => ({
-        ...prev,
-        Levels: prev.Levels.filter((level) => level.id !== levelToDelete),
-      }));
-      setSelectedRows([]);
-      setShowDeleteOverlay(false);
-      setLevelToDelete(null);
-      setError(null);
-    } catch (err) {
-      setError((err as Error).message);
-      console.error("Delete level error:", err);
-    }
-  };
+  //     setLevelsData((prev) => ({
+  //       ...prev,
+  //       Levels: prev.Levels.filter((level) => level.id !== levelToDelete),
+  //     }));
+  //     setSelectedRows([]);
+  //     // setShowDeleteOverlay(false);
+  //     // setLevelToDelete(null);
+  //     setError(null);
+  //   } catch (err) {
+  //     setError((err as Error).message);
+  //     console.error("Delete level error:", err);
+  //   }
+  // };
 
   const handleExport = () => {
     const dataToExport = filteredData.map((level) => ({
@@ -310,10 +336,8 @@ const Levels: React.FC = () => {
                 </div>
               </div>
 
-              {/* Divider */}
               <div className="border-t border-white/20 mb-4"></div>
 
-              {/* Search, Filter, Delete */}
               <div className="flex justify-between items-center mb-4">
                 <div className="flex items-center bg-[#19191A] rounded-lg w-full max-w-[500px] h-[54px] p-4 relative sm:h-10">
                   <Image src="/search.png" alt="Search" width={16} height={16} />
@@ -331,7 +355,10 @@ const Levels: React.FC = () => {
                     onClick={() => setShowFilterDropdown(!showFilterDropdown)}
                   />
                   {showFilterDropdown && (
-                    <div className="absolute top-full right-0 mt-2 w-52 bg-white rounded-lg p-4 shadow-lg z-10 text-black">
+                    <div
+                      ref={filterDropdownRef} // Added ref for filter dropdown
+                      className="absolute top-full right-0 mt-2 w-52 bg-white rounded-lg p-4 shadow-lg z-10 text-black"
+                    >
                       <div className="mb-4">
                         <h4 className="text-xs font-bold mb-2">Level</h4>
                         {Object.keys(filters.level).map((level) => (
@@ -355,21 +382,19 @@ const Levels: React.FC = () => {
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  <button
+                  {/* <button
                     className="flex items-center gap-2 bg-red-600 text-white text-xs px-3 py-2 rounded-lg"
                     onClick={() => handleDelete(selectedRows[0])}
                     disabled={selectedRows.length !== 1}
                   >
                     <Image src="/delete.png" alt="Delete" width={12} height={12} />
                     Delete
-                  </button>
+                  </button> */}
                 </div>
               </div>
 
-              {/* Divider */}
               <div className="border-t border-white/20 mb-4"></div>
 
-              {/* Table Headers */}
               <div className="grid grid-cols-[40px_1.5fr_2fr_1fr_1fr_1fr] gap-3 text-[#AEAAAA] text-xs font-medium mb-2">
                 <div />
                 <div>Name</div>
@@ -379,10 +404,8 @@ const Levels: React.FC = () => {
                 <div>Action</div>
               </div>
 
-              {/* Divider */}
               <div className="border-t border-white/20 mb-4"></div>
 
-              {/* Table Content */}
               {filteredData.length === 0 ? (
                 <div className="text-white text-center text-xs">No levels to display</div>
               ) : (
@@ -412,7 +435,6 @@ const Levels: React.FC = () => {
                           height={16}
                           className="object-cover"
                         />
-                        {/* Optionally remove the text if you only want the image */}
                         <span className="truncate">{level.badge ? "Badge" : "N/A"}</span>
                       </div>
                       <div>{level.level || "N/A"}</div>
@@ -432,11 +454,14 @@ const Levels: React.FC = () => {
                           <Image src="/dropdown.png" alt="Dropdown" width={16} height={16} />
                         </div>
                         {showActionDropdown === index && (
-                          <div className="absolute right-0 mt-2 w-32 bg-white rounded-lg shadow-lg z-10 text-black p-2">
+                          <div
+                            ref={actionDropdownRef} // Added ref for action dropdown
+                            className="absolute right-0 mt-2 w-32 bg-white rounded-lg shadow-lg z-10 text-black p-2"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             <div
                               className="flex items-center gap-2 px-2 py-2 hover:bg-gray-100 cursor-pointer text-xs"
-                              onClick={(e) => {
-                                e.stopPropagation();
+                              onClick={() => {
                                 setLevelToEdit({
                                   id: level.id,
                                   name: level.name,
@@ -445,30 +470,25 @@ const Levels: React.FC = () => {
                                   badgeImage: null,
                                 });
                                 setShowCreateOverlay(true);
-                                setShowActionDropdown(null); // Close dropdown
+                                setShowActionDropdown(null);
                               }}
                             >
                               <Image src="/edit.png" alt="Edit" width={12} height={12} />
                               Edit
                             </div>
-                            <div
+                            {/* <div
                               className="flex items-center gap-2 px-2 py-2 hover:bg-gray-100 cursor-pointer text-xs"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDelete(level.id);
-                                // setShowActionDropdown(null) is already in handleDelete
-                              }}
+                              onClick={() => handleDelete(level.id)}
                             >
                               <Image src="/deletered.png" alt="Delete" width={12} height={12} />
                               Delete
-                            </div>
+                            </div> */}
                           </div>
                         )}
                       </div>
                     </div>
                   ))
               )}
-
               {/* Divider with Pagination */}
               <div className="relative mt-6">
                 <div className="border-t border-white/20"></div>
@@ -570,7 +590,7 @@ const Levels: React.FC = () => {
               }}
             />
           )}
-          {showDeleteOverlay && (
+          {/* {showDeleteOverlay && (
             <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50">
               <div className="bg-[#202022] rounded-lg p-6 text-white w-80 text-center">
                 <Image src="/Red Delete.png" alt="Delete" width={100} height={100} className="mx-auto mb-4" />
@@ -590,7 +610,7 @@ const Levels: React.FC = () => {
                 </button>
               </div>
             </div>
-          )}
+          )} */}
         </div>
       </div>
     </div>

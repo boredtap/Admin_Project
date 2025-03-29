@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import NavigationPanel from "@/components/NavigationPanel";
 import AppBar from "@/components/AppBar";
@@ -15,12 +15,12 @@ interface Filters {
 
 const Users: React.FC = () => {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null); // Keep error state
+  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"All Users" | "Top 1000">("All Users");
   const [showActionDropdown, setShowActionDropdown] = useState<number | null>(null);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [rowsPerPage, setRowsPerPage] = useState(8); // Changed from 5 to 8
   const [currentPage, setCurrentPage] = useState(1);
   const [showOverlay, setShowOverlay] = useState(false);
   const [usersData, setUsersData] = useState<{
@@ -46,9 +46,38 @@ const Users: React.FC = () => {
     },
   });
 
+  const actionDropdownRef = useRef<HTMLDivElement>(null); // Ref for action dropdown
+  const filterDropdownRef = useRef<HTMLDivElement>(null); // Ref for filter dropdown
+
   useEffect(() => {
     fetchUsers();
   }, []);
+
+    // Action dropdown outside click handler
+    useEffect(() => {
+      const handleClickOutsideAction = (event: MouseEvent) => {
+        if (actionDropdownRef.current && !actionDropdownRef.current.contains(event.target as Node)) {
+          setShowActionDropdown(null);
+        }
+      };
+      document.addEventListener("mousedown", handleClickOutsideAction);
+      return () => {
+        document.removeEventListener("mousedown", handleClickOutsideAction);
+      };
+    }, []);
+  
+    // Filter dropdown outside click handler
+    useEffect(() => {
+      const handleClickOutsideFilter = (event: MouseEvent) => {
+        if (filterDropdownRef.current && !filterDropdownRef.current.contains(event.target as Node)) {
+          setShowFilterDropdown(false);
+        }
+      };
+      document.addEventListener("mousedown", handleClickOutsideFilter);
+      return () => {
+        document.removeEventListener("mousedown", handleClickOutsideFilter);
+      };
+    }, []);
 
   const fetchUsers = async () => {
     try {
@@ -172,7 +201,7 @@ const Users: React.FC = () => {
         <AppBar screenName="Users Mgt" />
         <div className="flex-1 pt-28 pl-44 pr-2 bg-[#141414] lg:pl-52 sm:pt-24 sm:pl-0">
           <div className="flex-1 py-4 min-w-0 max-w-[calc(100%)]">
-            {error && <div className="text-red-500 text-center text-xs">Error: {error}</div>} {/* Display error */}
+            {error && <div className="text-red-500 text-center text-xs">Error: {error}</div>}
             <div className="bg-[#202022] rounded-lg p-4 border border-white/20">
               <div className="flex justify-between items-center mb-4">
                 <div className="flex gap-4">
@@ -218,7 +247,10 @@ const Users: React.FC = () => {
                     onClick={() => setShowFilterDropdown(!showFilterDropdown)}
                   />
                   {showFilterDropdown && (
-                    <div className="absolute top-full right-0 mt-2 w-52 bg-white rounded-lg p-4 shadow-lg z-10 text-black">
+                    <div
+                      ref={filterDropdownRef} // Added ref for filter dropdown
+                      className="absolute top-full right-0 mt-2 w-52 bg-white rounded-lg p-4 shadow-lg z-10 text-black"
+                    >
                       <div className="mb-4">
                         <h4 className="text-xs font-bold mb-2">Status</h4>
                         {Object.keys(filters.status).map((status) => (
@@ -343,7 +375,11 @@ const Users: React.FC = () => {
                             <Image src="/dropdown.png" alt="Dropdown" width={16} height={16} />
                           </div>
                           {showActionDropdown === index && (
-                            <div className="absolute right-0 mt-2 w-32 bg-white rounded-lg shadow-lg z-10 text-black p-2">
+                            <div
+                              ref={actionDropdownRef} // Added ref for action dropdown
+                              className="absolute right-0 mt-2 w-32 bg-white rounded-lg shadow-lg z-10 text-black p-2"
+                              onClick={(e) => e.stopPropagation()}
+                            >
                               {isActive && (
                                 <>
                                   <div

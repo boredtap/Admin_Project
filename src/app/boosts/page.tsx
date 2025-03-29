@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import NavigationPanel from "@/components/NavigationPanel";
@@ -37,11 +37,10 @@ const Boosts: React.FC = () => {
   const [activeTab, setActiveTab] = useState<"Boost" | "Multiplier" | "Recharging Speed" | "Autobot Tapping">("Boost");
   const [showActionDropdown, setShowActionDropdown] = useState<number | null>(null);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
-  const [showDeleteOverlay, setShowDeleteOverlay] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [rowsPerPage, setRowsPerPage] = useState(8);
   const [currentPage, setCurrentPage] = useState(1);
   const [boostsData, setBoostsData] = useState<{
     "Boost": Boost[];
@@ -70,10 +69,13 @@ const Boosts: React.FC = () => {
       "10": false,
     },
   });
+
   const [showCreateBoosterOverlay, setShowCreateBoosterOverlay] = useState(false);
   const [boostToEdit, setBoostToEdit] = useState<BoostFormData | null>(null);
 
   const router = useRouter();
+  const actionDropdownRef = useRef<HTMLDivElement>(null); // Ref for action dropdown
+  const filterDropdownRef = useRef<HTMLDivElement>(null); // Ref for filter dropdown
 
   const isTokenExpired = (token: string): boolean => {
     const payload = JSON.parse(atob(token.split(".")[1]));
@@ -141,6 +143,31 @@ const Boosts: React.FC = () => {
     fetchBoosts();
   }, [fetchBoosts]);
 
+  useEffect(() => {
+    const handleClickOutsideAction = (event: MouseEvent) => {
+      if (actionDropdownRef.current && !actionDropdownRef.current.contains(event.target as Node)) {
+        setShowActionDropdown(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutsideAction);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutsideAction);
+    };
+  }, []);
+
+  // Filter dropdown outside click handler
+  useEffect(() => {
+    const handleClickOutsideFilter = (event: MouseEvent) => {
+      if (filterDropdownRef.current && !filterDropdownRef.current.contains(event.target as Node)) {
+        setShowFilterDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutsideFilter);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutsideFilter);
+    };
+  }, []);
+
   // Rest of the functions remain largely the same, just updating type references
   const handleFilterChange = (category: "level", value: string) => {
     setFilters((prev) => ({
@@ -160,7 +187,7 @@ const Boosts: React.FC = () => {
   };
 
   const handleEditUpgradeCost = async (boost: Boost) => {
-    setShowActionDropdown(null);
+    setShowActionDropdown(null); // Close dropdown after action
     const newCost = prompt("Enter new upgrade cost:", boost.upgrade_cost.toString());
     if (newCost) {
       try {
@@ -181,25 +208,7 @@ const Boosts: React.FC = () => {
     }
   };
 
-  const handleDelete = async () => {
-    try {
-      const token = localStorage.getItem("access_token");
-      await Promise.all(
-        selectedRows.map((boostId) =>
-          fetch(`${API_BASE_URL}/admin/boost/extra_booster?extra_boost_id=${boostId}`, {
-            method: "DELETE",
-            headers: { Authorization: `Bearer ${token}` },
-          })
-        )
-      );
-      await fetchBoosts();
-      setSelectedRows([]);
-      setShowDeleteOverlay(false);
-    } catch (error) {
-      console.error("Error deleting boosts:", error);
-      setError("Failed to delete selected boosts");
-    }
-  };
+  
 
   const handleExport = () => {
     const dataToExport = filteredData.map((boost) => ({
@@ -248,7 +257,6 @@ const Boosts: React.FC = () => {
             {error && <div className="text-red-500 text-center text-xs">Error: {error}</div>}
             {!loading && !error && (
               <div className="bg-[#202022] rounded-lg p-4 border border-white/20">
-                {/* Tabs and Buttons */}
                 <div className="flex justify-between items-center mb-4">
                   <div className="flex gap-4">
                     {["Boost", "Multiplier", "Recharging Speed", "Autobot Tapping"].map((tab) => (
@@ -281,7 +289,6 @@ const Boosts: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Rest of the JSX remains the same */}
                 <div className="border-t border-white/20 mb-4"></div>
                 <div className="flex justify-between items-center mb-4">
                   <div className="flex items-center bg-[#19191A] rounded-lg w-full max-w-[500px] h-[54px] p-4 relative sm:h-10">
@@ -302,7 +309,10 @@ const Boosts: React.FC = () => {
                       onClick={() => setShowFilterDropdown(!showFilterDropdown)}
                     />
                     {showFilterDropdown && (
-                      <div className="absolute top-full right-0 mt-2 w-52 bg-white rounded-lg p-4 shadow-lg z-10 text-black">
+                      <div
+                        ref={filterDropdownRef} // Added ref for filter dropdown
+                        className="absolute top-full right-0 mt-2 w-52 bg-white rounded-lg p-4 shadow-lg z-10 text-black"
+                      >
                         <div className="mb-4">
                           <h4 className="text-xs font-bold mb-2">Boost Level</h4>
                           {Object.keys(filters.level).map((level) => (
@@ -324,13 +334,7 @@ const Boosts: React.FC = () => {
                       <Image src="/Date.png" alt="Date" width={12} height={12} />
                       <span>DD-MM-YYYY</span>
                     </button>
-                    <button
-                      className="flex items-center gap-2 bg-red-600 text-white text-xs px-3 py-2 rounded-lg"
-                      onClick={() => setShowDeleteOverlay(true)}
-                    >
-                      <Image src="/delete.png" alt="Delete" width={12} height={12} />
-                      Delete
-                    </button>
+                    {/* Removed Delete button */}
                   </div>
                 </div>
                 <div className="border-t border-white/20 mb-4"></div>
@@ -372,13 +376,20 @@ const Boosts: React.FC = () => {
                     <div className="relative">
                       <div
                         className="flex items-center gap-2 cursor-pointer"
-                        onClick={() => handleActionClick(index)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleActionClick(index);
+                        }}
                       >
                         <span className="text-xs">Action</span>
                         <Image src="/dropdown.png" alt="Dropdown" width={16} height={16} />
                       </div>
                       {showActionDropdown === index && (
-                        <div className="absolute right-0 mt-2 w-32 bg-white rounded-lg shadow-lg z-10 text-black p-2">
+                        <div
+                          ref={actionDropdownRef} // Added ref for action dropdown
+                          className="absolute right-0 mt-2 w-32 bg-white rounded-lg shadow-lg z-10 text-black p-2"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           <div
                             className="flex items-center gap-2 px-2 py-2 hover:bg-gray-100 cursor-pointer text-xs"
                             onClick={() => handleEditUpgradeCost(boost)}
@@ -386,13 +397,7 @@ const Boosts: React.FC = () => {
                             <Image src="/edit.png" alt="Edit" width={12} height={12} />
                             Edit Cost
                           </div>
-                          <div
-                            className="flex items-center gap-2 px-2 py-2 hover:bg-gray-100 cursor-pointer text-xs"
-                            onClick={() => setShowDeleteOverlay(true)}
-                          >
-                            <Image src="/deletered.png" alt="Delete" width={12} height={12} />
-                            Delete
-                          </div>
+                          {/* Removed Delete option */}
                         </div>
                       )}
                     </div>
@@ -485,27 +490,7 @@ const Boosts: React.FC = () => {
             }}
           />
         )}
-        {showDeleteOverlay && (
-          <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50">
-            <div className="bg-[#202022] rounded-lg p-6 text-white w-80 text-center">
-              <Image src="/Red Delete.png" alt="Delete" width={100} height={100} className="mx-auto mb-4" />
-              <h2 className="text-xl font-bold mb-4">Delete?</h2>
-              <p className="text-xs mb-6">Are you sure to delete this boost?</p>
-              <button
-                className="w-full bg-black text-white py-2 rounded-lg hover:bg-red-600 mb-4"
-                onClick={handleDelete}
-              >
-                Delete
-              </button>
-              <button
-                className="text-white underline bg-transparent border-none cursor-pointer text-xs"
-                onClick={() => setShowDeleteOverlay(false)}
-              >
-                Back
-              </button>
-            </div>
-          </div>
-        )}
+        {/* Removed showDeleteOverlay section */}
       </div>
     </div>
   );

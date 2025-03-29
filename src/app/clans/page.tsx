@@ -1,7 +1,6 @@
-// src/app/clans/page.tsx
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 import NavigationPanel from "@/components/NavigationPanel";
 import AppBar from "@/components/AppBar";
@@ -29,13 +28,12 @@ const Clans: React.FC = () => {
   const [showApproveOverlay, setShowApproveOverlay] = useState(false);
   const [showDisbandOverlay, setShowDisbandOverlay] = useState(false);
   const [showResumeOverlay, setShowResumeOverlay] = useState(false);
-  const [selectedRows, setSelectedRows] = useState<string[]>([]);
-  const [activeTab, setActiveTab] = useState<string>("All Clans");
+  const [selectedRows, setSelectedRows] = useState<string | null>(null);  const [activeTab, setActiveTab] = useState<string>("All Clans");
   const [showActionDropdown, setShowActionDropdown] = useState<number | null>(null);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [rowsPerPage, setRowsPerPage] = useState(8); // Default to 8 rows
   const [currentPage, setCurrentPage] = useState(1);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [error, setError] = useState<string | null>(null);
@@ -64,6 +62,36 @@ const Clans: React.FC = () => {
     Disband: [],
   });
 
+  const actionDropdownRef = useRef<HTMLDivElement>(null); // Ref for action dropdown
+    const filterDropdownRef = useRef<HTMLDivElement>(null); // Ref for filter dropdown
+  
+
+  // Click outside to close dropdown (from Rewards)
+  useEffect(() => {
+        const handleClickOutsideAction = (event: MouseEvent) => {
+          if (actionDropdownRef.current && !actionDropdownRef.current.contains(event.target as Node)) {
+            setShowActionDropdown(null);
+          }
+        };
+        document.addEventListener("mousedown", handleClickOutsideAction);
+        return () => {
+          document.removeEventListener("mousedown", handleClickOutsideAction);
+        };
+      }, []);
+    
+      // Filter dropdown outside click handler
+      useEffect(() => {
+        const handleClickOutsideFilter = (event: MouseEvent) => {
+          if (filterDropdownRef.current && !filterDropdownRef.current.contains(event.target as Node)) {
+            setShowFilterDropdown(false);
+          }
+        };
+        document.addEventListener("mousedown", handleClickOutsideFilter);
+        return () => {
+          document.removeEventListener("mousedown", handleClickOutsideFilter);
+        };
+      }, []);
+
   const fetchClans = useCallback(
     async (category: string, page = currentPage, pageSize = rowsPerPage) => {
       try {
@@ -74,7 +102,7 @@ const Clans: React.FC = () => {
           "All Clans": "all_clans",
           Active: "active",
           "Pending Approval": "pending",
-          Disband: "disband",
+          Disband: "disbanded",
         };
         const apiCategory = categoryMap[category] || "all_clans";
 
@@ -84,13 +112,17 @@ const Clans: React.FC = () => {
             headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
           }
         );
-        if (!response.ok) throw new Error("Failed to fetch clans");
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Failed to fetch ${category} clans: ${errorText}`);
+        }
 
         const data: Clan[] = await response.json();
         setClansData((prev) => ({ ...prev, [category]: data }));
         setError(null);
       } catch (err) {
         setError((err as Error).message);
+        console.error("Fetch clans error:", err);
       }
     },
     [currentPage, rowsPerPage]
@@ -140,7 +172,7 @@ const Clans: React.FC = () => {
       await alterClanStatus(selectedClanId, "approve");
       setShowApproveOverlay(false);
       setSelectedClanId(null);
-      setSelectedRows([]);
+      setSelectedRows(null); // Changed from []
       if (showClanOverlay === selectedClanId) {
         setClansData((prev) => ({
           ...prev,
@@ -157,7 +189,7 @@ const Clans: React.FC = () => {
       await alterClanStatus(selectedClanId, "disband");
       setShowDisbandOverlay(false);
       setSelectedClanId(null);
-      setSelectedRows([]);
+      setSelectedRows(null); // Changed from []
       if (showClanOverlay === selectedClanId) {
         setClansData((prev) => ({
           ...prev,
@@ -174,7 +206,7 @@ const Clans: React.FC = () => {
       await alterClanStatus(selectedClanId, "resume");
       setShowResumeOverlay(false);
       setSelectedClanId(null);
-      setSelectedRows([]);
+      setSelectedRows(null); // Changed from []
       if (showClanOverlay === selectedClanId) {
         setClansData((prev) => ({
           ...prev,
@@ -276,29 +308,21 @@ const Clans: React.FC = () => {
     }));
   };
 
-  const handleRowClick = (clanId: string, event: React.MouseEvent) => {
-    event.stopPropagation();
-    const isCheckbox = (event.target as HTMLElement).tagName === "DIV" && (event.target as HTMLElement).className.includes("border-2");
-    if (isCheckbox) {
-      setSelectedRows((prev) =>
-        prev.includes(clanId) ? prev.filter((id) => id !== clanId) : [...prev, clanId]
-      );
-      setSelectedClanId(clanId);
-    } else {
-      setShowClanOverlay(clanId);
-    }
+  const handleRowClick = (clanId: string) => {
+    setSelectedRows(clanId); // Set to single clanId
+    setShowClanOverlay(clanId); // Open overlay
   };
 
-  const handleActionClick = (index: number, event: React.MouseEvent) => {
-    event.stopPropagation();
+  const handleActionClick = (index: number) => {
     setShowActionDropdown(showActionDropdown === index ? null : index);
   };
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
-    setSelectedRows([]);
+    setSelectedRows(null); // Changed from []
     setShowActionDropdown(null);
     setSelectedClanId(null);
+    setCurrentPage(1);
   };
 
   const handleExport = () => {
@@ -346,7 +370,6 @@ const Clans: React.FC = () => {
           <div className="flex-1 py-4 min-w-0 max-w-[calc(100%)]">
             {error && <div className="text-red-500 text-center text-xs">Error: {error}</div>}
             <div className="bg-[#202022] rounded-lg p-4 border border-white/20">
-              {/* Tabs and Buttons */}
               <div className="flex justify-between items-center mb-4">
                 <div className="flex gap-4">
                   {["All Clans", "Active", "Pending Approval", "Disband"].map((tab) => (
@@ -378,10 +401,8 @@ const Clans: React.FC = () => {
                 </div>
               </div>
 
-              {/* Divider Under Tabs */}
               <div className="border-t border-white/20 mb-4"></div>
 
-              {/* Search, Date, Delete */}
               <div className="flex justify-between items-center mb-4">
                 <div className="flex items-center bg-[#19191A] rounded-lg w-full max-w-[500px] h-[54px] p-4 relative sm:h-10">
                   <Image src="/search.png" alt="Search" width={16} height={16} />
@@ -401,6 +422,10 @@ const Clans: React.FC = () => {
                     onClick={() => setShowFilterDropdown(!showFilterDropdown)}
                   />
                   {showFilterDropdown && (
+                    <div
+                      ref={filterDropdownRef} // Optional: Added ref for filter dropdown
+                      className="absolute top-full right-0 mt-2 w-52 bg-white rounded-lg p-4 shadow-lg z-10 text-black"
+                    >
                     <div className="absolute top-full right-0 mt-2 w-52 bg-white rounded-lg p-4 shadow-lg z-10 text-black">
                       <div className="mb-4">
                         <h4 className="text-xs font-bold mb-2">Clan Status</h4>
@@ -415,7 +440,8 @@ const Clans: React.FC = () => {
                           </label>
                         ))}
                       </div>
-                      <div>
+                      </div>
+                      
                         <h4 className="text-xs font-bold mb-2">Clan Level</h4>
                         {Object.keys(filters.level).map((level) => (
                           <label key={level} className="flex items-center gap-2 text-xs mb-2">
@@ -428,7 +454,7 @@ const Clans: React.FC = () => {
                           </label>
                         ))}
                       </div>
-                    </div>
+                  
                   )}
                 </div>
                 <div className="flex items-center gap-2">
@@ -448,7 +474,8 @@ const Clans: React.FC = () => {
                   </div>
                   <button
                     className="flex items-center gap-2 bg-red-600 text-white text-xs px-3 py-2 rounded-lg"
-                    onClick={() => selectedClanId && handleDisband(selectedClanId)}
+                    onClick={() => selectedRows && setShowDisbandOverlay(true)} // Check if selectedRows is truthy
+                    disabled={!selectedRows} // Disable if null
                   >
                     <Image src="/delete.png" alt="Delete" width={12} height={12} />
                     Delete
@@ -456,10 +483,8 @@ const Clans: React.FC = () => {
                 </div>
               </div>
 
-              {/* Divider */}
               <div className="border-t border-white/20 mb-4"></div>
 
-              {/* Table Headers */}
               <div className="grid grid-cols-[40px_1.5fr_2fr_1fr_1fr_1fr_1fr_1fr] gap-3 text-[#AEAAAA] text-xs font-medium mb-2">
                 <div />
                 <div>Clan Name</div>
@@ -471,24 +496,24 @@ const Clans: React.FC = () => {
                 <div>Action</div>
               </div>
 
-              {/* Divider */}
               <div className="border-t border-white/20 mb-4"></div>
 
-              {/* Table Content */}
               {filteredData.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage).map((clan, index) => (
                 <div
                   key={clan.id}
                   className={`grid grid-cols-[40px_1.5fr_2fr_1fr_1fr_1fr_1fr_1fr] gap-3 py-3 text-xs ${
-                    selectedRows.includes(clan.id) ? "bg-white text-black rounded-lg" : "text-white"
+                    selectedRows === clan.id ? "bg-white text-black rounded-lg" : "text-white"
                   }`}
-                  onClick={(e) => handleRowClick(clan.id, e)}
+                  onClick={() => handleRowClick(clan.id)}
                 >
                   <div className="flex items-center justify-center">
                     <div
-                      className={`w-4 h-4 border-2 rounded-full cursor-pointer ${
-                        selectedRows.includes(clan.id) ? "bg-black border-black" : "border-white"
+                      className={`w-4 h-4 border-2 rounded-full cursor-pointer flex items-center justify-center ${
+                        selectedRows === clan.id ? "border-black bg-black" : "border-white"
                       }`}
-                    />
+                    >
+                      {selectedRows === clan.id && <div className="w-2 h-2 bg-white rounded-full" />}
+                    </div>
                   </div>
                   <div className="truncate">{clan.name}</div>
                   <div>{clan.creator}</div>
@@ -512,63 +537,66 @@ const Clans: React.FC = () => {
                     </span>
                   </div>
                   <div className="relative">
-                    <div
-                      className="flex items-center gap-2 cursor-pointer"
-                      onClick={(e) => handleActionClick(index, e)}
+                    <button
+                      className="flex items-center gap-2 cursor-pointer bg-transparent border-none text-xs text-white"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleActionClick(index);
+                      }}
                     >
-                      <span className="text-xs">Action</span>
+                      <span>Action</span>
                       <Image src="/dropdown.png" alt="Dropdown" width={16} height={16} />
-                    </div>
+                    </button>
                     {showActionDropdown === index && (
-                      <div className="absolute right-0 mt-2 w-32 bg-white rounded-lg shadow-lg z-10 text-black p-2">
+                      <div
+                        ref={actionDropdownRef}
+                        className="absolute right-0 mt-2 w-32 bg-white rounded-lg shadow-lg z-20 text-black p-2"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         {clan.status.toLowerCase() === "disband" ? (
-                          <div
-                            className="flex items-center gap-2 px-2 py-2 hover:bg-gray-100 cursor-pointer text-xs"
-                            onClick={(e) => {
-                              e.stopPropagation();
+                          <button
+                            className="flex items-center gap-2 px-2 py-2 hover:bg-gray-100 cursor-pointer text-xs w-full text-left"
+                            onClick={() => {
                               handleResume(clan.id);
-                              setShowActionDropdown(null); // Close dropdown
+                              setShowActionDropdown(null);
                             }}
                           >
                             <Image src="/edit.png" alt="Resume" width={12} height={12} />
                             Resume
-                          </div>
+                          </button>
                         ) : clan.status.toLowerCase() === "pending" ? (
-                          <div
-                            className="flex items-center gap-2 px-2 py-2 hover:bg-gray-100 cursor-pointer text-xs"
-                            onClick={(e) => {
-                              e.stopPropagation();
+                          <button
+                            className="flex items-center gap-2 px-2 py-2 hover:bg-gray-100 cursor-pointer text-xs w-full text-left"
+                            onClick={() => {
                               handleApprove(clan.id);
-                              setShowActionDropdown(null); // Close dropdown
+                              setShowActionDropdown(null);
                             }}
                           >
                             <Image src="/edit.png" alt="Approve" width={12} height={12} />
                             Approve
-                          </div>
+                          </button>
                         ) : (
                           <>
-                            <div
-                              className="flex items-center gap-2 px-2 py-2 hover:bg-gray-100 cursor-pointer text-xs"
-                              onClick={(e) => {
-                                e.stopPropagation();
+                            <button
+                              className="flex items-center gap-2 px-2 py-2 hover:bg-gray-100 cursor-pointer text-xs w-full text-left"
+                              onClick={() => {
                                 handleApprove(clan.id);
-                                setShowActionDropdown(null); // Close dropdown
+                                setShowActionDropdown(null);
                               }}
                             >
                               <Image src="/edit.png" alt="Approve" width={12} height={12} />
                               Approve
-                            </div>
-                            <div
-                              className="flex items-center gap-2 px-2 py-2 hover:bg-gray-100 cursor-pointer text-xs"
-                              onClick={(e) => {
-                                e.stopPropagation();
+                            </button>
+                            <button
+                              className="flex items-center gap-2 px-2 py-2 hover:bg-gray-100 cursor-pointer text-xs w-full text-left"
+                              onClick={() => {
                                 handleDisband(clan.id);
-                                setShowActionDropdown(null); // Close dropdown
+                                setShowActionDropdown(null);
                               }}
                             >
                               <Image src="/deletered.png" alt="Disband" width={12} height={12} />
                               Disband
-                            </div>
+                            </button>
                           </>
                         )}
                       </div>
@@ -577,7 +605,6 @@ const Clans: React.FC = () => {
                 </div>
               ))}
 
-              {/* Divider with Pagination */}
               <div className="relative mt-6">
                 <div className="border-t border-white/20"></div>
                 <div className="flex flex-col sm:flex-row justify-between items-center mt-4 text-white">
@@ -635,7 +662,6 @@ const Clans: React.FC = () => {
           </div>
         </div>
 
-        {/* Overlays */}
         {showClanOverlay && (
           <ClanProfileOverlay
             onClose={() => setShowClanOverlay(null)}

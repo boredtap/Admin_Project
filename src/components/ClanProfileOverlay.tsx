@@ -1,4 +1,3 @@
-// src/components/ClanProfileOverlay.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -46,24 +45,20 @@ const ClanProfileOverlay: React.FC<ClanProfileOverlayProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [clanImage, setClanImage] = useState<string | null>(null);
 
-  
   useEffect(() => {
     const fetchClanProfile = async () => {
       try {
         const token = localStorage.getItem("access_token");
         if (!token) throw new Error("No access token found");
 
-       // Fetch clan details
-       const clanResponse = await fetch(`${API_BASE_URL}/admin/clan/get_clan/${clanId}`, {
-        headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-      });
-      if (!clanResponse.ok) throw new Error("Failed to fetch clan profile");
-      const clanData: Clan = await clanResponse.json();
-      setClan(clanData);
+        const clanResponse = await fetch(`${API_BASE_URL}/admin/clan/get_clan/${clanId}`, {
+          headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+        });
+        if (!clanResponse.ok) throw new Error("Failed to fetch clan profile");
+        const clanData: Clan = await clanResponse.json();
+        setClan(clanData);
 
-        // Fetch clan image dynamically
-        // Assuming image_id is either part of clanData or can be derived; fallback to clanId if no image_id
-        const imageId = clanData.image_id || clanId; // Use image_id if available, otherwise clanId
+        const imageId = clanData.image_id || clanId;
         const imageResponse = await fetch(
           `${API_BASE_URL}/admin/clan/get_clan/${clanId}/image?image_id=${imageId}`,
           {
@@ -78,7 +73,6 @@ const ClanProfileOverlay: React.FC<ClanProfileOverlayProps> = ({
           setClanImage(URL.createObjectURL(imageBlob));
         }
 
-        // Fetch top earners
         const topEarnersResponse = await fetch(
           `${API_BASE_URL}/admin/clan/clan/${clanId}/top_earner?page_number=1&page_size=20`,
           {
@@ -172,7 +166,7 @@ const ClanProfileOverlay: React.FC<ClanProfileOverlayProps> = ({
         <div className="mb-6">
           <h3 className="text-[#f9b54c] text-sm font-bold mb-2">Clan Details</h3>
           <hr className="border-[#363638] mb-4" />
-          <div className="flex justify-between text-sm">
+          <div className="grid grid-cols-4 gap-4 text-sm">
             <div className="flex flex-col">
               <span className="text-xs text-[#AEAAAA]">Clan Rank</span>
               <p>{clan.rank}</p>
@@ -196,8 +190,7 @@ const ClanProfileOverlay: React.FC<ClanProfileOverlayProps> = ({
         <div>
           <h3 className="text-[#f9b54c] text-sm font-bold mb-2">Clan Top Earners</h3>
           <hr className="border-[#363638] mb-4" />
-          <div className="grid grid-cols-[48px_1fr_1fr_1fr_1fr] gap-3 text-[#AEAAAA] text-xs font-medium py-3">
-            <div />
+          <div className="grid grid-cols-4 gap-4 text-[#AEAAAA] text-xs font-medium py-3">
             <div>User Name</div>
             <div>Level</div>
             <div>Total Coin</div>
@@ -207,11 +200,8 @@ const ClanProfileOverlay: React.FC<ClanProfileOverlayProps> = ({
             topEarners.map((earner, index) => (
               <div
                 key={index}
-                className="grid grid-cols-[48px_1fr_1fr_1fr_1fr] gap-3 py-3 text-sm text-white"
+                className="grid grid-cols-4 gap-4 py-3 text-sm text-white"
               >
-                <div className="flex items-center justify-center">
-                  <div className="w-5 h-5 border-2 border-white rounded-full" />
-                </div>
                 <div>{earner.username}</div>
                 <div>{earner.level}</div>
                 <div>{earner.total_coins}</div>
@@ -219,10 +209,7 @@ const ClanProfileOverlay: React.FC<ClanProfileOverlayProps> = ({
               </div>
             ))
           ) : (
-            <div className="grid grid-cols-[48px_1fr_1fr_1fr_1fr] gap-3 py-3 text-sm text-white">
-              <div className="flex items-center justify-center">
-                <div className="w-5 h-5 border-2 border-white rounded-full" />
-              </div>
+            <div className="grid grid-cols-4 gap-4 py-3 text-sm text-white">
               <div>-</div>
               <div>-</div>
               <div>-</div>
